@@ -6,7 +6,7 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['eslint.config.mjs'],
+    ignores: ['eslint.config.ts'],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
@@ -17,10 +17,10 @@ export default tseslint.config(
         ...globals.node,
         ...globals.jest,
       },
-      sourceType: 'commonjs',
+      sourceType: 'module',
       parserOptions: {
         projectService: true,
-        tsconfigRootDir: import.meta.dirname,
+        tsconfigRootDir: __dirname,
       },
     },
   },
@@ -32,7 +32,7 @@ export default tseslint.config(
       "prettier/prettier": ["error", { endOfLine: "auto" }],
       "no-unused-vars": [
         "error",
-        { "argsIgnorePattern": "^_" }
+        { "argsIgnorePattern": /^_/ }
       ]
     },
   },
