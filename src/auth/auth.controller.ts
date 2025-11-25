@@ -1,6 +1,14 @@
-import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common';
-import { SignupDto } from './dto/signup.dto';
+import {
+  Body,
+  Controller,
+  HttpCode,
+  HttpStatus,
+  Post,
+  UsePipes,
+} from '@nestjs/common';
+import { type SignupDto, signupSchema } from './validation/auth.schemes';
 import { AuthService } from './auth.service';
+import { ZodValidationPipe } from 'src/pipes/ZodValidationPipe';
 
 @Controller('api/auth')
 export class AuthController {
@@ -8,7 +16,8 @@ export class AuthController {
 
   @Post('signup')
   @HttpCode(HttpStatus.CREATED)
+  @UsePipes(new ZodValidationPipe(signupSchema))
   signup(@Body() signupDto: SignupDto) {
-    return this.authService.signup(signupDto.email);
+    return this.authService.signup(signupDto);
   }
 }
