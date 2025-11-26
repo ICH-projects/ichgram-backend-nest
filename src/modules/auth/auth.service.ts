@@ -6,22 +6,23 @@ import { JwtService } from '@nestjs/jwt';
 import { SignupDto } from './validation/auth.schemes';
 import { User } from './models/user.model';
 import { MailService } from '../mail/mail.service';
-
+import { InjectModel } from '@nestjs/sequelize';
 
 @Injectable()
 export class AuthService {
   constructor(
-    private sequelize: Sequelize,
-    private jwtService: JwtService,
-    private mailService: MailService,
+    private readonly sequelize: Sequelize,
+    private readonly jwtService: JwtService,
+    private readonly mailService: MailService,
+    @InjectModel(User) private userRepository: typeof User,
   ) {}
 
-  async signup(signupDto: SignupDto) {
+  async signup(signupDto: SignupDto): Promise<string> {
     try {
       await this.sequelize.transaction(async (t) => {
         const transactionHost = { transaction: t };
         const passwordHash: string = await bcrypt.hash(signupDto.password, 10);
-        await User.create(
+        await this.userRepository.create(
           { ...signupDto, password: passwordHash },
           transactionHost,
         );

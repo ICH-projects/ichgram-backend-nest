@@ -1,7 +1,7 @@
 import { PipeTransform, ArgumentMetadata } from '@nestjs/common';
 import { ZodError, ZodType, prettifyError } from 'zod';
 
-import { HttpValidationException } from 'src/exceptions/HttpValidation.exception';
+import { HttpValidationException } from '../exceptions/HttpValidation.exception';
 
 export class ZodValidationPipe<T> implements PipeTransform {
   constructor(private schema: ZodType<T>) {}

@@ -9,8 +9,9 @@ import {
   Unique,
 } from 'sequelize-typescript';
 
-import { emailPattern } from 'src/modules/auth/validation/auth.patterns';
 import { Session } from './session.model';
+
+import { emailPattern } from '../validation/auth.patterns';
 
 @Table
 export class User extends Model {
@@ -18,16 +19,16 @@ export class User extends Model {
   @Unique
   @Is({ args: emailPattern.regexp, msg: emailPattern.message })
   @Column
-  email: string;
+  declare email: string;
 
   @AllowNull(false)
   @Column
-  password: string;
+  declare password: string;
 
   @AllowNull(false)
   @Default(false)
   @Column
-  isConfirmed: boolean;
+  declare isConfirmed: boolean;
 
   @HasOne(() => Session)
   session: Session;

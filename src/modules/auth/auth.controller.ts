@@ -8,7 +8,7 @@ import {
 } from '@nestjs/common';
 import { type SignupDto, signupSchema } from './validation/auth.schemes';
 import { AuthService } from './auth.service';
-import { ZodValidationPipe } from 'src/pipes/ZodValidationPipe';
+import { ZodValidationPipe } from '../../pipes/ZodValidationPipe';
 
 @Controller('api/auth')
 export class AuthController {
