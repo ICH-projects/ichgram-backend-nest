@@ -2,19 +2,20 @@ import {
   ExceptionFilter,
   Catch,
   ArgumentsHost,
-  HttpException,
+  HttpStatus,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
-import { HttpValidationException } from 'src/exceptions/HttpValidation.exception';
+import { UniqueConstraintError } from 'sequelize';
 
-@Catch(HttpException, HttpValidationException)
-export class HttpValidationExceptionFilter implements ExceptionFilter {
-  catch(exception: HttpException, host: ArgumentsHost) {
+@Catch(UniqueConstraintError)
+export class DBConstraintExceptionFilter implements ExceptionFilter {
+  catch(exception: UniqueConstraintError, host: ArgumentsHost) {
+
     const ctx = host.switchToHttp();
     const response = ctx.getResponse<Response>();
     const request = ctx.getRequest<Request>();
-    const status = exception.getStatus();
-    const message = exception.message;
+    const status = HttpStatus.CONFLICT;
+    const message = exception.errors.map(({ message }) => message).join(";\n");
 
     response.status(status).json({
       statusCode: status,

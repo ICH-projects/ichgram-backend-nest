@@ -9,7 +9,7 @@ import {
   Unique,
 } from 'sequelize-typescript';
 
-import { emailPattern } from 'src/auth/validation/auth.patterns';
+import { emailPattern } from 'src/modules/auth/validation/auth.patterns';
 import { Session } from './session.model';
 
 @Table
