@@ -22,7 +22,7 @@ import {
 } from '@nestjs/swagger';
 import { ExceptionResponseDto } from '../../filters/ExceptionResponse.dto';
 
-@ApiTags('users')
+@ApiTags('Auth')
 @Controller({ path: 'api/auth', version: '1' })
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
