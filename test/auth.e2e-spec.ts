@@ -1,11 +1,14 @@
 import request from 'supertest';
 import { Test } from '@nestjs/testing';
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, VersioningType } from '@nestjs/common';
 import { Sequelize } from 'sequelize-typescript';
 import { AppModule } from '../src/app.module';
 import { DBConstraintExceptionFilter } from '../src/filters/DBConstraintException.filter';
 
 describe('Signup (e2e)', () => {
+  const version: string = '1';
+  const path = `/v${version}/api/auth/signup`;
+
   let app: INestApplication;
   let sequelize: Sequelize;
 
@@ -16,6 +19,7 @@ describe('Signup (e2e)', () => {
     }).compile();
 
     app = moduleRef.createNestApplication();
+    app.enableVersioning({ type: VersioningType.URI });
     app.useGlobalFilters(new DBConstraintExceptionFilter());
     await app.init();
 
@@ -34,7 +38,7 @@ describe('Signup (e2e)', () => {
   it(`should sign up successfully with valid credentials`, async () => {
     const body = { email: 'zolotukhinpv@i.ua', password: 'passWord1%' };
     const response = await request(app.getHttpServer())
-      .post('/api/auth/signup')
+      .post(path)
       .send(body)
       .expect(201);
 
@@ -46,7 +50,7 @@ describe('Signup (e2e)', () => {
   it(`should fail when a duplicate email`, async () => {
     const body = { email: 'zolotukhinpv@i.ua', password: 'passWord1%' };
     let response = await request(app.getHttpServer())
-      .post('/api/auth/signup')
+      .post(path)
       .send(body)
       .expect(201);
 
@@ -55,9 +59,12 @@ describe('Signup (e2e)', () => {
     );
 
     response = await request(app.getHttpServer())
-      .post('/api/auth/signup')
+      .post(path)
       .send(body)
       .expect(409);
+
+      console.log("----------response.body: ", response.body);
+      
 
     expect(response.body.message).toMatch(/email must be unique/);
   });
@@ -65,7 +72,7 @@ describe('Signup (e2e)', () => {
   it(`should fail when request body is empty`, async () => {
     const body = undefined;
     const response = await request(app.getHttpServer())
-      .post('/api/auth/signup')
+      .post(path)
       .send(body)
       .expect(400);
 
@@ -78,7 +85,7 @@ describe('Signup (e2e)', () => {
     const body = { email: 'wrongemail', password: 'passWord1' };
 
     const response = await request(app.getHttpServer())
-      .post('/api/auth/signup')
+      .post(path)
       .send(body)
       .expect(400);
 
@@ -89,7 +96,7 @@ describe('Signup (e2e)', () => {
     const body = { email: 'zolotukhinpv@i.ua', password: 'pA1%s' };
 
     const response = await request(app.getHttpServer())
-      .post('/api/auth/signup')
+      .post(path)
       .send(body)
       .expect(400);
 
@@ -100,7 +107,7 @@ describe('Signup (e2e)', () => {
     const body = { email: 'zolotukhinpv@i.ua', password: 'password' };
 
     const response = await request(app.getHttpServer())
-      .post('/api/auth/signup')
+      .post(path)
       .send(body)
       .expect(400);
 

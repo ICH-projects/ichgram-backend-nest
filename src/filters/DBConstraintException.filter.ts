@@ -17,7 +17,7 @@ export class DBConstraintExceptionFilter implements ExceptionFilter {
       statusCode: HttpStatus.CONFLICT,
       timestamp: new Date().toISOString(),
       path: host.switchToHttp().getRequest<Request>().url,
-      message: exception.message,
+      message: exception.errors.map(({ message }) => message).join(';\n'),
     };
 
     response.status(HttpStatus.CONFLICT).json(exceptionDto);

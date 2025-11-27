@@ -5,6 +5,7 @@ import {
   HttpStatus,
   Post,
   UsePipes,
+  Version,
 } from '@nestjs/common';
 import { signupSchema } from './validation/auth.schemes';
 import { SignupDto } from './dto/Signup.dto';
@@ -19,10 +20,10 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { ExceptionResponseDto } from 'src/filters/ExceptionResponse.dto';
+import { ExceptionResponseDto } from '../../filters/ExceptionResponse.dto';
 
 @ApiTags('users')
-@Controller('api/auth')
+@Controller({ path: 'api/auth', version: '1' })
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 

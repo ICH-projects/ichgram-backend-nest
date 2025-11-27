@@ -3,9 +3,14 @@ import { AppModule } from './app.module';
 import { HttpValidationExceptionFilter } from './filters/HttpValidationException.filter';
 import { DBConstraintExceptionFilter } from './filters/DBConstraintException.filter';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { VersioningType } from '@nestjs/common';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  app.enableVersioning({
+    type: VersioningType.URI,
+    defaultVersion: '1',
+  });
   app.useGlobalFilters(
     new HttpValidationExceptionFilter(),
     new DBConstraintExceptionFilter(),
