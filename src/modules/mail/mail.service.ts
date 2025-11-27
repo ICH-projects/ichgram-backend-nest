@@ -5,7 +5,9 @@ import { Injectable, Logger } from '@nestjs/common';
 export class MailService {
   private readonly logger = new Logger(MailService.name);
 
-  constructor(private readonly mailerService: MailerService) {}
+  constructor(
+    private readonly mailerService: MailerService,
+  ) {}
 
   async sendEmail(params: {
     emailsList: string[];
@@ -14,7 +16,6 @@ export class MailService {
     context: ISendMailOptions['context'];
   }) {
     try {
-
       const sendMailParams = {
         to: params.emailsList,
         from: process.env.GOOGLE_EMAIL,

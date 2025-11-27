@@ -4,6 +4,7 @@ import { PugAdapter } from '@nestjs-modules/mailer/dist/adapters/pug.adapter';
 import * as path from 'path';
 
 import { MailService } from './mail.service';
+import { GmailImapService } from './gmailImap.service';
 
 @Module({
   imports: [
@@ -32,7 +33,7 @@ import { MailService } from './mail.service';
       }),
     }),
   ],
-  providers: [MailService],
-  exports: [MailService],
+  providers: [MailService, GmailImapService],
+  exports: [MailService, GmailImapService],
 })
 export class MailModule {}
