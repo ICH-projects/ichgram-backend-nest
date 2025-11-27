@@ -4,7 +4,7 @@ export const emailPattern = {
 };
 
 export const passwordPattern = {
-  regexp: /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z0-9]+$/,
+  regexp: /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/,
   message:
-    'Password must contain at least one uppercase letter, one lowercase letter, numeric character, one special character',
+    'Password must contain at least one uppercase letter, one lowercase letter, numeric character, one special character. Minimum length: 8',
 };
