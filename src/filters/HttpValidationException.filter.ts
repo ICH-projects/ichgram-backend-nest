@@ -6,21 +6,20 @@ import {
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { HttpValidationException } from 'src/exceptions/HttpValidation.exception';
+import { ExceptionResponseDto } from './ExceptionResponse.dto';
 
 @Catch(HttpException, HttpValidationException)
 export class HttpValidationExceptionFilter implements ExceptionFilter {
   catch(exception: HttpException, host: ArgumentsHost) {
-    const ctx = host.switchToHttp();
-    const response = ctx.getResponse<Response>();
-    const request = ctx.getRequest<Request>();
-    const status = exception.getStatus();
-    const message = exception.message;
+    const response = host.switchToHttp().getResponse<Response>();
 
-    response.status(status).json({
-      statusCode: status,
+    const exceptionDto: ExceptionResponseDto = {
+      statusCode: exception.getStatus(),
       timestamp: new Date().toISOString(),
-      path: request.url,
-      message,
-    });
+      path: host.switchToHttp().getRequest<Request>().url,
+      message: exception.message,
+    };
+
+    response.status(exception.getStatus()).json(exceptionDto);
   }
 }

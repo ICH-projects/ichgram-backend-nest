@@ -6,21 +6,20 @@ import {
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { UniqueConstraintError } from 'sequelize';
+import { ExceptionResponseDto } from './ExceptionResponse.dto';
 
 @Catch(UniqueConstraintError)
 export class DBConstraintExceptionFilter implements ExceptionFilter {
   catch(exception: UniqueConstraintError, host: ArgumentsHost) {
-    const ctx = host.switchToHttp();
-    const response = ctx.getResponse<Response>();
-    const request = ctx.getRequest<Request>();
-    const status = HttpStatus.CONFLICT;
-    const message = exception.errors.map(({ message }) => message).join(';\n');
+    const response = host.switchToHttp().getResponse<Response>();
 
-    response.status(status).json({
-      statusCode: status,
+    const exceptionDto: ExceptionResponseDto = {
+      statusCode: HttpStatus.CONFLICT,
       timestamp: new Date().toISOString(),
-      path: request.url,
-      message,
-    });
+      path: host.switchToHttp().getRequest<Request>().url,
+      message: exception.message,
+    };
+
+    response.status(HttpStatus.CONFLICT).json(exceptionDto);
   }
 }
