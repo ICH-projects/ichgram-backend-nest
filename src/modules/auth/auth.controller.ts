@@ -21,6 +21,7 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { ExceptionResponseDto } from '../../filters/ExceptionResponse.dto';
+import { SignupResponseDto } from './dto/SignupResponse.dto';
 
 @ApiTags('Auth')
 @Controller({ path: 'api/auth', version: '1' })
@@ -42,10 +43,16 @@ export class AuthController {
     },
   })
   @ApiResponse({
-    status: 201,
+    status: HttpStatus.CREATED,
+    type: SignupResponseDto,
     description: 'The record has been successfully created.',
-    example:
-      'Signup successfully, a message containing a confirmation link has been sent to email: someemail@example.com',
+    example: {
+      payload: null,
+      meta: {
+        message:
+          'Signup successfully, a message containing a confirmation link has been sent to email: someemail@example.com',
+      },
+    } ,
   })
   @ApiConflictResponse({
     type: ExceptionResponseDto,
@@ -101,7 +108,13 @@ export class AuthController {
   @Post('signup')
   @HttpCode(HttpStatus.CREATED)
   @UsePipes(new ZodValidationPipe(signupSchema))
-  signup(@Body() signupDto: SignupDto) {
-    return this.authService.signup(signupDto);
+  async signup(
+    @Body() signupDto: SignupDto,
+  ): Promise<SignupResponseDto> {
+    const message = await this.authService.signup(signupDto);
+    return {
+      payload: null,
+      meta: { message: message },
+    } as SignupResponseDto;
   }
 }

@@ -37,6 +37,6 @@ describe('AuthController', () => {
     const result = await controller.signup(dto);
 
     expect(authService.signup).toHaveBeenCalledWith(dto);
-    expect(result).toEqual(mockResponse);
+    expect(result).toEqual({"meta": {"message": mockResponse}, "payload": null});
   });
 });

@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import { object, z } from 'zod';
 import { emailPattern, passwordPattern } from './auth.patterns';
 
 export const signupSchema = z
@@ -9,3 +9,12 @@ export const signupSchema = z
   .required();
 
 export type SignupDto = z.infer<typeof signupSchema>;
+
+export const signupResponseSchema = z.object({
+  payload: z.null(),
+  meta: object({
+    message: z.string(),
+  }),
+});
+
+export type SignupResponseDto = z.infer<typeof signupResponseSchema>;

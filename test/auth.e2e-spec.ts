@@ -42,7 +42,7 @@ describe('Signup (e2e)', () => {
       .send(body)
       .expect(201);
 
-    expect(response.text).toBe(
+    expect(response.body.meta.message).toBe(
       `Signup successfully, a message containing a confirmation link has been sent to email: ${body.email}`,
     );
   });
@@ -54,7 +54,7 @@ describe('Signup (e2e)', () => {
       .send(body)
       .expect(201);
 
-    expect(response.text).toBe(
+    expect(response.body.meta.message).toBe(
       `Signup successfully, a message containing a confirmation link has been sent to email: ${body.email}`,
     );
 
@@ -63,8 +63,7 @@ describe('Signup (e2e)', () => {
       .send(body)
       .expect(409);
 
-      console.log("----------response.body: ", response.body);
-      
+    console.log('----------response.body: ', response.body);
 
     expect(response.body.message).toMatch(/email must be unique/);
   });
