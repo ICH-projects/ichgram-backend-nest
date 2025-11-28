@@ -14,7 +14,7 @@ import { JwtStrategy } from './jwt.strategy';
     SequelizeModule.forFeature([User, Session]),
     JwtModule.register({
       global: true,
-      secret: process.env.JWT_SECRET,
+      secret: process.env.JWT_SECRET || "jwt_secret",
       signOptions: { expiresIn: '60s' },
     }),
     PassportModule,
