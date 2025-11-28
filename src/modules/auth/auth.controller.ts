@@ -52,7 +52,7 @@ export class AuthController {
         message:
           'Signup successfully, a message containing a confirmation link has been sent to email: someemail@example.com',
       },
-    } ,
+    },
   })
   @ApiConflictResponse({
     type: ExceptionResponseDto,
@@ -108,13 +108,11 @@ export class AuthController {
   @Post('signup')
   @HttpCode(HttpStatus.CREATED)
   @UsePipes(new ZodValidationPipe(signupSchema))
-  async signup(
-    @Body() signupDto: SignupDto,
-  ): Promise<SignupResponseDto> {
+  async signup(@Body() signupDto: SignupDto): Promise<SignupResponseDto> {
     const message = await this.authService.signup(signupDto);
     return {
       payload: null,
-      meta: { message: message },
+      message,
     } as SignupResponseDto;
   }
 }

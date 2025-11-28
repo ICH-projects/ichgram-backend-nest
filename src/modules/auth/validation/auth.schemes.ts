@@ -12,9 +12,7 @@ export type SignupDto = z.infer<typeof signupSchema>;
 
 export const signupResponseSchema = z.object({
   payload: z.null(),
-  meta: object({
-    message: z.string(),
-  }),
+  message: z.string(),
 });
 
 export type SignupResponseDto = z.infer<typeof signupResponseSchema>;

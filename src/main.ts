@@ -4,6 +4,7 @@ import { HttpValidationExceptionFilter } from './filters/HttpValidationException
 import { DBConstraintExceptionFilter } from './filters/DBConstraintException.filter';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { VersioningType } from '@nestjs/common';
+import { version } from '../package.json';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -19,7 +20,7 @@ async function bootstrap() {
   const config = new DocumentBuilder()
     .setTitle('ichgram API')
     .setDescription('API documentation')
-    .setVersion('1.0')
+    .setVersion(version)
     .addBearerAuth()
     .build();
 

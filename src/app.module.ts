@@ -4,17 +4,13 @@ import { SequelizeModule } from '@nestjs/sequelize';
 
 import databaseConfig from './config/database-config';
 
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
 import { AuthModule } from './modules/auth/auth.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot(),
+    ConfigModule.forRoot({ isGlobal: true }),
     SequelizeModule.forRoot(databaseConfig()),
     AuthModule,
   ],
-  controllers: [AppController],
-  providers: [AppService],
 })
 export class AppModule {}

@@ -42,7 +42,7 @@ describe('Signup (e2e)', () => {
       .send(body)
       .expect(201);
 
-    expect(response.body.meta.message).toBe(
+    expect(response.body.message).toBe(
       `Signup successfully, a message containing a confirmation link has been sent to email: ${body.email}`,
     );
   });
@@ -54,7 +54,7 @@ describe('Signup (e2e)', () => {
       .send(body)
       .expect(201);
 
-    expect(response.body.meta.message).toBe(
+    expect(response.body.message).toBe(
       `Signup successfully, a message containing a confirmation link has been sent to email: ${body.email}`,
     );
 
