@@ -1,11 +1,12 @@
 import {
   Body,
   Controller,
+  Get,
   HttpCode,
   HttpStatus,
   Post,
+  UseGuards,
   UsePipes,
-  Version,
 } from '@nestjs/common';
 import { signupSchema } from './validation/auth.schemes';
 import { SignupDto } from './dto/Signup.dto';
@@ -15,13 +16,16 @@ import {
   ApiBadRequestResponse,
   ApiBody,
   ApiConflictResponse,
-  ApiOkResponse,
   ApiOperation,
+  ApiQuery,
   ApiResponse,
   ApiTags,
+  ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 import { ExceptionResponseDto } from '../../filters/ExceptionResponse.dto';
 import { SignupResponseDto } from './dto/SignupResponse.dto';
+import { JwtAuthGuard } from './jwt-auth.guard';
+import { User } from './decorators/User.decorator';
 
 @ApiTags('Auth')
 @Controller({ path: 'api/auth', version: '1' })
@@ -48,10 +52,8 @@ export class AuthController {
     description: 'The record has been successfully created.',
     example: {
       payload: null,
-      meta: {
-        message:
-          'Signup successfully, a message containing a confirmation link has been sent to email: someemail@example.com',
-      },
+      message:
+        'Signup successfully, a message containing a confirmation link has been sent to email: someemail@example.com',
     },
   })
   @ApiConflictResponse({
@@ -110,6 +112,68 @@ export class AuthController {
   @UsePipes(new ZodValidationPipe(signupSchema))
   async signup(@Body() signupDto: SignupDto): Promise<SignupResponseDto> {
     const message = await this.authService.signup(signupDto);
+    return {
+      payload: null,
+      message,
+    } as SignupResponseDto;
+  }
+
+  @ApiOperation({ summary: 'confirm email' })
+  @ApiQuery({
+    required: true,
+    type: String,
+    name: 'token',
+    example:
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6InpvbG90dWtoaW5wdkBpLnVhIiwiaWF0IjoxNzY0MzU3MjQyLCJleHAiOjE3NjQzNTgxNDJ9.YvEHQMFJvqOs43pCPr74noD5bgNJue4C83cj9dLweRA',
+  })
+  @ApiResponse({
+    status: HttpStatus.OK,
+    type: SignupResponseDto,
+    description: 'email successfully confirmed.',
+    example: {
+      payload: null,
+      message: 'Email successfully confirmed',
+    },
+  })
+  @ApiUnauthorizedResponse({
+    type: SignupResponseDto,
+    description: 'token not valid or not exists',
+    examples: {
+      a: {
+        summary: 'token not valid',
+        value: {
+          statusCode: 401,
+          timestamp: '2025-11-28T19:44:42.437Z',
+          path: '/v1/api/auth/confirm?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6InpvbG90dWtoaW5wdkBpLnVhIiwiaWF0IjoxNzY0MzU3MjQyLCJleHAiOjE3NjQzNTgxNDJ9.YvEHQMFJvqOs43pCPr74noD5bgNJue4C83cj9dLweRA',
+          message: 'Unauthorized',
+        },
+      },
+      b: {
+        summary: 'token is not exists',
+        value: {
+          statusCode: 401,
+          timestamp: '2025-11-28T19:44:42.437Z',
+          path: '/v1/api/auth/confirm',
+          message: 'Unauthorized',
+        },
+      },
+    },
+  })
+  @ApiBadRequestResponse({
+    type: SignupResponseDto,
+    description: 'the token does not belong to the user',
+    example: {
+      statusCode: 400,
+      timestamp: '2025-11-28T19:44:42.437Z',
+      path: '/v1/api/auth/confirm?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6InpvbG90dWtoaW5wdkBpLnVhIiwiaWF0IjoxNzY0MzU3MjQyLCJleHAiOjE3NjQzNTgxNDJ9.YvEHQMFJvqOs43pCPr74noD5bgNJue4C83cj9dLweRA',
+      message: 'User with email: wrongEmail@example.com not found',
+    },
+  })
+  @UseGuards(JwtAuthGuard)
+  @Get('confirm')
+  @HttpCode(HttpStatus.OK)
+  async confirmEmail(@User('email') userEmail: string) {
+    const message = await this.authService.confirmEmail(userEmail);
     return {
       payload: null,
       message,

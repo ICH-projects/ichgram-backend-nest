@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { Sequelize } from 'sequelize-typescript';
 import { JwtService } from '@nestjs/jwt';
@@ -47,5 +47,16 @@ export class AuthService {
       throw error;
     }
     return `Signup successfully, a message containing a confirmation link has been sent to email: ${signupDto.email}`;
+  }
+
+  async confirmEmail(email: string): Promise<string> {
+    const user = await User.findOne({ where: { email } });
+    if (!user)
+      throw new HttpException(
+        `User with email: ${email} not found`,
+        HttpStatus.BAD_REQUEST,
+      );
+    await user.update({ isVerified: true });
+    return `Email successfully confirmed`;
   }
 }

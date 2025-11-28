@@ -4,13 +4,16 @@ import { INestApplication, VersioningType } from '@nestjs/common';
 import { Sequelize } from 'sequelize-typescript';
 import { AppModule } from '../src/app.module';
 import { DBConstraintExceptionFilter } from '../src/filters/DBConstraintException.filter';
+import { JwtService } from '@nestjs/jwt';
 
 describe('Signup (e2e)', () => {
   const version: string = '1';
-  const path = `/v${version}/api/auth/signup`;
+  const signupPath = `/v${version}/api/auth/signup`;
+  const confirmEmailPath = `/v${version}/api/auth/confirm`;
 
   let app: INestApplication;
   let sequelize: Sequelize;
+  let jwtService: JwtService;
 
   beforeAll(async () => {
     process.env.NODE_ENV = 'test';
@@ -22,6 +25,8 @@ describe('Signup (e2e)', () => {
     app.enableVersioning({ type: VersioningType.URI });
     app.useGlobalFilters(new DBConstraintExceptionFilter());
     await app.init();
+
+    jwtService = moduleRef.get<JwtService>(JwtService);
 
     sequelize = moduleRef.get<Sequelize>(Sequelize);
     await sequelize.sync({ force: true });
@@ -38,7 +43,7 @@ describe('Signup (e2e)', () => {
   it(`should sign up successfully with valid credentials`, async () => {
     const body = { email: 'zolotukhinpv@i.ua', password: 'passWord1%' };
     const response = await request(app.getHttpServer())
-      .post(path)
+      .post(signupPath)
       .send(body)
       .expect(201);
 
@@ -50,7 +55,7 @@ describe('Signup (e2e)', () => {
   it(`should fail when a duplicate email`, async () => {
     const body = { email: 'zolotukhinpv@i.ua', password: 'passWord1%' };
     let response = await request(app.getHttpServer())
-      .post(path)
+      .post(signupPath)
       .send(body)
       .expect(201);
 
@@ -59,11 +64,9 @@ describe('Signup (e2e)', () => {
     );
 
     response = await request(app.getHttpServer())
-      .post(path)
+      .post(signupPath)
       .send(body)
       .expect(409);
-
-    console.log('----------response.body: ', response.body);
 
     expect(response.body.message).toMatch(/email must be unique/);
   });
@@ -71,7 +74,7 @@ describe('Signup (e2e)', () => {
   it(`should fail when request body is empty`, async () => {
     const body = undefined;
     const response = await request(app.getHttpServer())
-      .post(path)
+      .post(signupPath)
       .send(body)
       .expect(400);
 
@@ -84,7 +87,7 @@ describe('Signup (e2e)', () => {
     const body = { email: 'wrongemail', password: 'passWord1' };
 
     const response = await request(app.getHttpServer())
-      .post(path)
+      .post(signupPath)
       .send(body)
       .expect(400);
 
@@ -95,7 +98,7 @@ describe('Signup (e2e)', () => {
     const body = { email: 'zolotukhinpv@i.ua', password: 'pA1%s' };
 
     const response = await request(app.getHttpServer())
-      .post(path)
+      .post(signupPath)
       .send(body)
       .expect(400);
 
@@ -106,10 +109,78 @@ describe('Signup (e2e)', () => {
     const body = { email: 'zolotukhinpv@i.ua', password: 'password' };
 
     const response = await request(app.getHttpServer())
-      .post(path)
+      .post(signupPath)
       .send(body)
       .expect(400);
 
     expect(response.body.message).toMatch(/Password must contain/);
+  });
+
+  it(`should confirm email successfully`, async () => {
+    const body = { email: 'zolotukhinpv@i.ua', password: 'passWord1%' };
+    await request(app.getHttpServer()).post(signupPath).send(body).expect(201);
+
+    const token: string = await jwtService.signAsync(
+      {
+        email: body.email,
+      },
+      { expiresIn: '15m', secret: process.env.JWT_SECRET },
+    );
+
+    const response = await request(app.getHttpServer())
+      .get(confirmEmailPath)
+      .query({ token })
+      .send(body)
+      .expect(200);
+
+    expect(response.body.message).toBe(`Email successfully confirmed`);
+  });
+
+  it(`should fail when token is missing`, async () => {
+    const body = { email: 'zolotukhinpv@i.ua', password: 'passWord1%' };
+    await request(app.getHttpServer()).post(signupPath).send(body).expect(201);
+
+    const response = await request(app.getHttpServer())
+      .get(confirmEmailPath)
+      .send(body)
+      .expect(401);
+
+    expect(response.body.message).toBe(`Unauthorized`);
+  });
+
+  it(`should fail when token is not valid`, async () => {
+    const body = { email: 'zolotukhinpv@i.ua', password: 'passWord1%' };
+    await request(app.getHttpServer()).post(signupPath).send(body).expect(201);
+
+    const token: string = 'wrong_token';
+
+    const response = await request(app.getHttpServer())
+      .get(confirmEmailPath)
+      .query({ token })
+      .send(body)
+      .expect(401);
+
+    expect(response.body.message).toBe(`Unauthorized`);
+  });
+
+  it(`should fail when token is wrong`, async () => {
+    const body = { email: 'zolotukhinpv@i.ua', password: 'passWord1%' };
+    const wrongEmail = 'zolotukhinpv2@i.ua'
+    await request(app.getHttpServer()).post(signupPath).send(body).expect(201);
+
+    const token: string = await jwtService.signAsync(
+      {
+        email: wrongEmail,
+      },
+      { expiresIn: '15m', secret: process.env.JWT_SECRET },
+    );
+
+    const response = await request(app.getHttpServer())
+      .get(confirmEmailPath)
+      .query({ token })
+      .send(body)
+      .expect(400);
+
+    expect(response.body.message).toBe(`User with email: ${wrongEmail} not found`);
   });
 });

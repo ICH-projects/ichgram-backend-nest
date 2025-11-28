@@ -6,6 +6,8 @@ import { User } from './models/user.model';
 import { Session } from './models/session.model';
 import { JwtModule } from '@nestjs/jwt';
 import { MailModule } from '../mail/mail.module';
+import { PassportModule } from '@nestjs/passport';
+import { JwtStrategy } from './jwt.strategy';
 
 @Module({
   imports: [
@@ -15,9 +17,10 @@ import { MailModule } from '../mail/mail.module';
       secret: process.env.JWT_SECRET,
       signOptions: { expiresIn: '60s' },
     }),
-    MailModule
+    PassportModule,
+    MailModule,
   ],
-  providers: [AuthService],
+  providers: [AuthService, JwtStrategy],
   controllers: [AuthController],
 })
 export class AuthModule {}
