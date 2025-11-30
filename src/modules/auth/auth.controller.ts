@@ -5,27 +5,37 @@ import {
   HttpCode,
   HttpStatus,
   Post,
+  Res,
   UseGuards,
   UsePipes,
 } from '@nestjs/common';
-import { signupSchema } from './validation/auth.schemes';
-import { SignupDto } from './dto/Signup.dto';
-import { AuthService } from './auth.service';
-import { ZodValidationPipe } from '../../pipes/ZodValidationPipe';
 import {
   ApiBadRequestResponse,
   ApiBody,
   ApiConflictResponse,
+  ApiForbiddenResponse,
+  ApiNotFoundResponse,
+  ApiOkResponse,
   ApiOperation,
   ApiQuery,
   ApiResponse,
   ApiTags,
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
+
+import { loginSchema, signupSchema } from './validation/auth.schemes';
+import { SignupDto } from './dto/Signup.dto';
+import { LoginDto } from './dto/Login.dto';
+import { AuthResponseDto } from './dto/AuthResponse.dto';
+
+import { ZodValidationPipe } from '../../pipes/ZodValidationPipe';
 import { ExceptionResponseDto } from '../../filters/ExceptionResponse.dto';
-import { SignupResponseDto } from './dto/SignupResponse.dto';
 import { JwtAuthGuard } from './jwt-auth.guard';
+
 import { User } from './decorators/User.decorator';
+
+import { AuthService } from './auth.service';
+import type { Response } from 'express';
 
 @ApiTags('Auth')
 @Controller({ path: 'api/auth', version: '1' })
@@ -48,7 +58,7 @@ export class AuthController {
   })
   @ApiResponse({
     status: HttpStatus.CREATED,
-    type: SignupResponseDto,
+    type: AuthResponseDto,
     description: 'The record has been successfully created.',
     example: {
       payload: null,
@@ -67,6 +77,7 @@ export class AuthController {
     },
   })
   @ApiBadRequestResponse({
+    type: ExceptionResponseDto,
     description: 'Fail when request body invalid',
     examples: {
       a: {
@@ -110,12 +121,12 @@ export class AuthController {
   @Post('signup')
   @HttpCode(HttpStatus.CREATED)
   @UsePipes(new ZodValidationPipe(signupSchema))
-  async signup(@Body() signupDto: SignupDto): Promise<SignupResponseDto> {
+  async signup(@Body() signupDto: SignupDto): Promise<AuthResponseDto> {
     const message = await this.authService.signup(signupDto);
     return {
       payload: null,
       message,
-    } as SignupResponseDto;
+    } as AuthResponseDto;
   }
 
   @ApiOperation({ summary: 'confirm email' })
@@ -128,7 +139,7 @@ export class AuthController {
   })
   @ApiResponse({
     status: HttpStatus.OK,
-    type: SignupResponseDto,
+    type: AuthResponseDto,
     description: 'email successfully confirmed.',
     example: {
       payload: null,
@@ -136,7 +147,7 @@ export class AuthController {
     },
   })
   @ApiUnauthorizedResponse({
-    type: SignupResponseDto,
+    type: ExceptionResponseDto,
     description: 'token not valid or not exists',
     examples: {
       a: {
@@ -160,7 +171,7 @@ export class AuthController {
     },
   })
   @ApiBadRequestResponse({
-    type: SignupResponseDto,
+    type: ExceptionResponseDto,
     description: 'the token does not belong to the user',
     example: {
       statusCode: 400,
@@ -177,6 +188,140 @@ export class AuthController {
     return {
       payload: null,
       message,
-    } as SignupResponseDto;
+    } as AuthResponseDto;
+  }
+
+  @ApiOperation({ summary: 'login user' })
+  @ApiBody({
+    type: [LoginDto],
+    required: true,
+    examples: {
+      a: {
+        summary: 'Example with valid body',
+        value: {
+          email: 'someemail@example.com',
+          password: 'passWord1%',
+        } as LoginDto,
+      },
+    },
+  })
+  @ApiOkResponse({
+    type: AuthResponseDto,
+    description: 'login successfully.',
+    headers: {
+      'Set-Cookie': {
+        description: 'Returns accessToken & refreshToken cookies.',
+        schema: {
+          type: 'string',
+          example:
+            'accessToken=abc123; HttpOnly; Path=/; Max-Age=3600000\n' +
+            'refreshToken=xyz456; HttpOnly; Path=/; Max-Age=604800000',
+        },
+      },
+    },
+    example: {
+      payload: { email: 'someemail@example.com' },
+      message: 'Login successfully',
+    },
+  })
+  @ApiBadRequestResponse({
+    type: ExceptionResponseDto,
+    description: 'Fail when request body invalid',
+    examples: {
+      a: {
+        summary: 'request body is empty',
+        value: {
+          statusCode: HttpStatus.BAD_REQUEST,
+          timestamp: new Date().toISOString(),
+          path: '/api/auth/login',
+          message: 'Invalid input: expected object, received undefined',
+        },
+      },
+      b: {
+        summary: 'email format is invalid',
+        value: {
+          statusCode: HttpStatus.BAD_REQUEST,
+          timestamp: new Date().toISOString(),
+          path: '/api/auth/login',
+          message: 'Please enter a valid email address',
+        },
+      },
+      c: {
+        summary: 'password is too short',
+        value: {
+          statusCode: HttpStatus.BAD_REQUEST,
+          timestamp: new Date().toISOString(),
+          path: '/api/auth/login',
+          message: 'Minimum length: ...',
+        },
+      },
+      d: {
+        summary: 'password does not meet complexity requirements',
+        value: {
+          statusCode: HttpStatus.BAD_REQUEST,
+          timestamp: new Date().toISOString(),
+          path: '/api/auth/login',
+          message: 'Password must contain ...',
+        },
+      },
+    },
+  })
+  @ApiNotFoundResponse({
+    type: ExceptionResponseDto,
+    description: 'Fail when user not found',
+    example: {
+      statusCode: HttpStatus.NOT_FOUND,
+      timestamp: new Date().toISOString(),
+      path: '/api/auth/login',
+      message: 'Email or password invalid',
+    },
+  })
+  @ApiForbiddenResponse({
+    type: ExceptionResponseDto,
+    description: 'Fail when user email not confirmed',
+    example: {
+      statusCode: HttpStatus.FORBIDDEN,
+      timestamp: new Date().toISOString(),
+      path: '/api/auth/login',
+      message:
+        'Email not confirmed, a message containing a confirmation link has been sent to email: someemail@example.com',
+    },
+  })
+  @Post('login')
+  @HttpCode(HttpStatus.OK)
+  @UsePipes(new ZodValidationPipe(loginSchema))
+  async login(
+    @Body() loginDto: LoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { accessToken, refreshToken } =
+      await this.authService.login(loginDto);
+
+    this.setAuthCookies(res, accessToken, refreshToken);
+
+    return {
+      payload: null,
+      message: 'Login successfully',
+    } as AuthResponseDto;
+  }
+
+  private setAuthCookies(
+    res: Response,
+    accessToken: string,
+    refreshToken: string,
+  ) {
+    res
+      .cookie('accessToken', accessToken, {
+        httpOnly: true,
+        path: '/',
+        maxAge: 60 * 60 * 1000,
+        sameSite: 'lax',
+      })
+      .cookie('refreshToken', refreshToken, {
+        httpOnly: true,
+        path: '/',
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+        sameSite: 'lax',
+      });
   }
 }

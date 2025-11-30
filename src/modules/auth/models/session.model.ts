@@ -12,15 +12,15 @@ import { User } from './user.model';
 export class Session extends Model {
   @AllowNull(false)
   @Column
-  accessToken: string;
+  declare accessToken: string;
 
   @AllowNull(false)
   @Column
-  refreshToken: string;
+  declare refreshToken: string;
 
   @ForeignKey(() => User)
   @Column
-  userId: number;
+  declare userId: number;
 
   @BelongsTo(() => User)
   user: User;

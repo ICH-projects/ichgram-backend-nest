@@ -2,11 +2,14 @@ import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
 import { Sequelize } from 'sequelize-typescript';
 import { JwtService } from '@nestjs/jwt';
+import { InjectModel } from '@nestjs/sequelize';
 
-import { SignupDto } from './validation/auth.schemes';
 import { User } from './models/user.model';
 import { MailService } from '../mail/mail.service';
-import { InjectModel } from '@nestjs/sequelize';
+
+import { LoginDto } from './dto/Login.dto';
+import { SignupDto } from './dto/Signup.dto';
+import { Session } from './models/session.model';
 
 @Injectable()
 export class AuthService {
@@ -26,22 +29,11 @@ export class AuthService {
           { ...signupDto, password: passwordHash },
           transactionHost,
         );
-        const confirmationToken: string = await this.jwtService.signAsync(
-          {
-            email: signupDto.email,
-          },
-          { expiresIn: '15m', secret: process.env.JWT_SECRET },
-        );
-
-        await this.mailService.sendEmail({
-          emailsList: [signupDto.email],
-          subject: `Welcome to ${process.env.APP}`,
-          template: 'signup-confirmation-email',
-          context: {
-            name: 'user',
-            verificationLink: `${process.env.FRONTEND_BASE_URL}/auth/confirm?token=${confirmationToken}`,
-          },
+        const { confirmationToken } = await this.createToken({
+          email: signupDto.email,
         });
+
+        await this.sendConfirmationEmail([signupDto.email], confirmationToken);
       });
     } catch (error) {
       throw error;
@@ -56,7 +48,84 @@ export class AuthService {
         `User with email: ${email} not found`,
         HttpStatus.BAD_REQUEST,
       );
-    await user.update({ isVerified: true });
+    await user.update({ isConfirmed: true });
     return `Email successfully confirmed`;
+  }
+
+  async login(
+    loginDto: LoginDto,
+  ): Promise<{ accessToken: string; refreshToken: string }> {
+    const user: User | null = await User.findOne({
+      where: { email: loginDto.email },
+    });
+    if (!user)
+      throw new HttpException(
+        'Email or password invalid',
+        HttpStatus.NOT_FOUND,
+      );
+
+    const isPasswordValid = await bcrypt.compare(
+      loginDto.password,
+      user.password,
+    );
+    if (!isPasswordValid)
+      throw new HttpException(
+        'Email or password invalid',
+        HttpStatus.NOT_FOUND,
+      );
+
+    if (!user.isConfirmed) {
+      const { confirmationToken } = await this.createToken({
+        email: loginDto.email,
+      });
+
+      await this.sendConfirmationEmail([loginDto.email], confirmationToken);
+
+      throw new HttpException(
+        `Email not confirmed, a message containing a confirmation link has been sent to email: ${loginDto.email}`,
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
+    await Session.destroy({ where: { userId: user.id } });
+
+    const { accessToken, refreshToken } = await this.createToken({
+      email: user.email,
+    });
+
+    await Session.create({ userId: user.id, accessToken, refreshToken });
+
+    return { accessToken, refreshToken };
+  }
+
+  private async createToken(payload: Record<string, string>) {
+    const accessToken: string = await this.jwtService.signAsync(payload, {
+      expiresIn: '60m',
+      secret: process.env.JWT_SECRET,
+    });
+    const refreshToken: string = await this.jwtService.signAsync(payload, {
+      expiresIn: '7d',
+      secret: process.env.JWT_SECRET,
+    });
+    const confirmationToken: string = await this.jwtService.signAsync(payload, {
+      expiresIn: '15m',
+      secret: process.env.JWT_SECRET,
+    });
+    return { confirmationToken, accessToken, refreshToken };
+  }
+
+  private async sendConfirmationEmail(
+    emailsList: string[],
+    confirmationToken: string,
+  ) {
+    await this.mailService.sendEmail({
+      emailsList,
+      subject: `Welcome to ${process.env.APP}`,
+      template: 'signup-confirmation-email',
+      context: {
+        name: 'user',
+        verificationLink: `${process.env.FRONTEND_BASE_URL}/auth/confirm?token=${confirmationToken}`,
+      },
+    });
   }
 }
