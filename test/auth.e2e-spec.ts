@@ -1,13 +1,17 @@
 import request from 'supertest';
+
 import { Test } from '@nestjs/testing';
 import { INestApplication, VersioningType } from '@nestjs/common';
-import { Sequelize } from 'sequelize-typescript';
 import { JwtService } from '@nestjs/jwt';
+import { getModelToken } from '@nestjs/sequelize';
+
+import { Sequelize } from 'sequelize-typescript';
 import cookieParser from 'cookie-parser';
 import Cookies from 'expect-cookies';
 
 import { AppModule } from '../src/app.module';
 import { DBConstraintExceptionFilter } from '../src/filters/DBConstraintException.filter';
+import { User } from '../src/modules/auth/models/user.model';
 
 describe('AUTH (e2e)', () => {
   const version: string = '1';
@@ -346,7 +350,7 @@ describe('AUTH (e2e)', () => {
     });
   });
 
-  describe('LOGOUT', () => {
+  describe.only('LOGOUT', () => {
     const validBody = { email: 'zolotukhinpv@i.ua', password: 'passWord1%' };
 
     beforeEach(async () => {
@@ -381,6 +385,30 @@ describe('AUTH (e2e)', () => {
         .expect(Cookies.not('set', { name: 'accessToken' }))
         .expect(Cookies.not('set', { name: 'refreshToken' }));
       expect(logoutResponse.body.message).toBe(`Logout successfully`);
+    });
+
+    it(`should fail when user not found`, async () => {
+      const userModel = app.get<typeof User>(getModelToken(User));
+      await userModel.destroy({ where: { email: validBody.email } });
+      const logoutResponse = await agent.get(logoutPath).expect(404);
+      expect(logoutResponse.body.message).toBe(
+        `User with email: ${validBody.email} not found`,
+      );
+    });
+
+    it(`should fail when accessToken not exists in cookie`, async () => {
+      const logoutResponse = await request(app.getHttpServer())
+        .get(logoutPath)
+        .expect(401);
+      expect(logoutResponse.body.message).toBe(`Unauthorized`);
+    });
+
+    it(`should fail when accessToken not valid`, async () => {
+      const logoutResponse = await request(app.getHttpServer())
+        .get(logoutPath)
+        .set('Cookie', 'accessToken=ffffffffffffffff')
+        .expect(401);
+      expect(logoutResponse.body.message).toBe(`Unauthorized`);
     });
   });
 });

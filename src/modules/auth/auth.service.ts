@@ -103,7 +103,7 @@ export class AuthService {
     if (!user)
       throw new HttpException(
         `User with email: ${email} not found`,
-        HttpStatus.BAD_REQUEST,
+        HttpStatus.NOT_FOUND,
       );
     await Session.destroy({ where: { userId: user.id } });
   }

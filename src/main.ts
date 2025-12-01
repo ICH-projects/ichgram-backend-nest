@@ -12,10 +12,10 @@ import { version } from '../package.json';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  app.enableCors({
-    origin: true, // allow all origins in test environment
-    credentials: true,
-  });
+  // app.enableCors({
+  //   origin: true, // allow all origins in test environment
+  //   credentials: true,
+  // });
   app.use(cookieParser());
   app.enableVersioning({
     type: VersioningType.URI,
