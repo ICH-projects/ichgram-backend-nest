@@ -5,6 +5,7 @@ import {
   HttpCode,
   HttpStatus,
   Post,
+  Req,
   Res,
   UseGuards,
   UsePipes,
@@ -13,6 +14,7 @@ import {
   ApiBadRequestResponse,
   ApiBody,
   ApiConflictResponse,
+  ApiCookieAuth,
   ApiForbiddenResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
@@ -30,12 +32,17 @@ import { AuthResponseDto } from './dto/AuthResponse.dto';
 
 import { ZodValidationPipe } from '../../pipes/ZodValidationPipe';
 import { ExceptionResponseDto } from '../../filters/ExceptionResponse.dto';
-import { JwtAuthGuard } from './jwt-auth.guard';
+import {
+  AccessJwtAuthGuard,
+  RefreshJwtAuthGuard,
+  ParamJwtAuthGuard,
+} from './jwt-auth.guard';
 
 import { User } from './decorators/User.decorator';
 
 import { AuthService } from './auth.service';
 import type { Response } from 'express';
+import { Request } from '@nestjs/common';
 
 @ApiTags('Auth')
 @Controller({ path: 'api/auth', version: '1' })
@@ -180,7 +187,7 @@ export class AuthController {
       message: 'User with email: wrongEmail@example.com not found',
     },
   })
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(ParamJwtAuthGuard)
   @Get('confirm')
   @HttpCode(HttpStatus.OK)
   async confirmEmail(@User('email') userEmail: string) {
@@ -296,12 +303,70 @@ export class AuthController {
   ) {
     const { accessToken, refreshToken } =
       await this.authService.login(loginDto);
-
     this.setAuthCookies(res, accessToken, refreshToken);
-
     return {
       payload: null,
       message: 'Login successfully',
+    } as AuthResponseDto;
+  }
+
+  @ApiOperation({ summary: 'logout user' })
+  @ApiCookieAuth('accessToken')
+  @ApiOkResponse({
+    type: AuthResponseDto,
+    description: 'logout successfully.',
+    example: {
+      payload: null,
+      message: 'Logout successfully',
+    },
+  })
+  @ApiNotFoundResponse({
+    type: ExceptionResponseDto,
+    description: 'Fail when user not found',
+    example: {
+      statusCode: HttpStatus.NOT_FOUND,
+      timestamp: new Date().toISOString(),
+      path: '/api/auth/logout',
+      message: 'User with email: someemail@example.com not found',
+    },
+  })
+  @ApiUnauthorizedResponse({
+    type: ExceptionResponseDto,
+    description: 'token not valid or not exists',
+    examples: {
+      a: {
+        summary: 'token not valid',
+        value: {
+          statusCode: 401,
+          timestamp: '2025-11-28T19:44:42.437Z',
+          path: '/v1/api/auth/logout',
+          message: 'Unauthorized',
+        },
+      },
+      b: {
+        summary: 'token is not exists',
+        value: {
+          statusCode: 401,
+          timestamp: '2025-11-28T19:44:42.437Z',
+          path: '/v1/api/auth/logout',
+          message: 'Unauthorized',
+        },
+      },
+    },
+  })
+  @Get('logout')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(new AccessJwtAuthGuard("access_jwt_cookie"))
+  async logout(
+    @User('email') userEmail: string,
+    @Res({ passthrough: true }) res: Response,
+    @Req() req: Request,
+  ) {
+    await this.authService.logout(userEmail);
+    this.clearAuthCookies(res);
+    return {
+      payload: null,
+      message: 'Logout successfully',
     } as AuthResponseDto;
   }
 
@@ -314,7 +379,7 @@ export class AuthController {
       .cookie('accessToken', accessToken, {
         httpOnly: true,
         path: '/',
-        maxAge: 60 * 60 * 1000,
+        maxAge:  60 * 60 * 1000,
         sameSite: 'lax',
       })
       .cookie('refreshToken', refreshToken, {
@@ -323,5 +388,8 @@ export class AuthController {
         maxAge: 7 * 24 * 60 * 60 * 1000,
         sameSite: 'lax',
       });
+  }
+  private clearAuthCookies(res: Response) {
+    res.clearCookie('accessToken').clearCookie('refreshToken');
   }
 }

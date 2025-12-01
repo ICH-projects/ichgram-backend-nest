@@ -2,19 +2,24 @@ import request from 'supertest';
 import { Test } from '@nestjs/testing';
 import { INestApplication, VersioningType } from '@nestjs/common';
 import { Sequelize } from 'sequelize-typescript';
+import { JwtService } from '@nestjs/jwt';
+import cookieParser from 'cookie-parser';
+import Cookies from 'expect-cookies';
+
 import { AppModule } from '../src/app.module';
 import { DBConstraintExceptionFilter } from '../src/filters/DBConstraintException.filter';
-import { JwtService } from '@nestjs/jwt';
 
 describe('AUTH (e2e)', () => {
   const version: string = '1';
   const signupPath = `/v${version}/api/auth/signup`;
   const confirmEmailPath = `/v${version}/api/auth/confirm`;
   const loginPath = `/v${version}/api/auth/login`;
+  const logoutPath = `/v${version}/api/auth/logout`;
 
   let app: INestApplication;
   let sequelize: Sequelize;
   let jwtService: JwtService;
+  let agent: request.Agent;
 
   beforeAll(async () => {
     process.env.NODE_ENV = 'test';
@@ -25,7 +30,10 @@ describe('AUTH (e2e)', () => {
     app = moduleRef.createNestApplication();
     app.enableVersioning({ type: VersioningType.URI });
     app.useGlobalFilters(new DBConstraintExceptionFilter());
+    app.use(cookieParser());
     await app.init();
+
+    agent = request.agent(app.getHttpServer());
 
     jwtService = moduleRef.get<JwtService>(JwtService);
 
@@ -335,6 +343,44 @@ describe('AUTH (e2e)', () => {
         .expect(404);
 
       expect(response.body.message).toBe(`Email or password invalid`);
+    });
+  });
+
+  describe('LOGOUT', () => {
+    const validBody = { email: 'zolotukhinpv@i.ua', password: 'passWord1%' };
+
+    beforeEach(async () => {
+      await agent.post(signupPath).send(validBody).expect(201);
+
+      const token: string = await jwtService.signAsync(
+        { email: validBody.email },
+        { expiresIn: '15m', secret: process.env.JWT_SECRET },
+      );
+
+      await agent.get(confirmEmailPath).query({ token }).expect(200);
+
+      const loginResponse = await agent
+        .post(loginPath)
+        .send(validBody)
+        .expect(200);
+
+      if (
+        !loginResponse.headers['set-cookie'] ||
+        loginResponse.headers['set-cookie'].length === 0
+      ) {
+        throw new Error(
+          'Login did not set any cookies. Check your auth setup.',
+        );
+      }
+    });
+
+    it(`should logout successfully and clear auth cookies`, async () => {
+      const logoutResponse = await agent
+        .get(logoutPath)
+        .expect(200)
+        .expect(Cookies.not('set', { name: 'accessToken' }))
+        .expect(Cookies.not('set', { name: 'refreshToken' }));
+      expect(logoutResponse.body.message).toBe(`Logout successfully`);
     });
   });
 });

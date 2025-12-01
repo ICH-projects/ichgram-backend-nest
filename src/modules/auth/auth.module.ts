@@ -1,26 +1,38 @@
 import { Module } from '@nestjs/common';
+import { SequelizeModule } from '@nestjs/sequelize';
+import { JwtModule } from '@nestjs/jwt';
+import { PassportModule } from '@nestjs/passport';
+
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
-import { SequelizeModule } from '@nestjs/sequelize';
+
 import { User } from './models/user.model';
 import { Session } from './models/session.model';
-import { JwtModule } from '@nestjs/jwt';
+
 import { MailModule } from '../mail/mail.module';
-import { PassportModule } from '@nestjs/passport';
-import { JwtStrategy } from './jwt.strategy';
+import {
+  AccessJwtCookieStrategy,
+  JwtParamStrategy,
+  RefreshJwtCookieStrategy,
+} from './jwt.strategy';
 
 @Module({
   imports: [
     SequelizeModule.forFeature([User, Session]),
     JwtModule.register({
       global: true,
-      secret: process.env.JWT_SECRET || "jwt_secret",
-      signOptions: { expiresIn: '60s' },
+      secret: process.env.JWT_SECRET || 'jwt_secret',
+      signOptions: { expiresIn: '1d' },
     }),
     PassportModule,
     MailModule,
   ],
-  providers: [AuthService, JwtStrategy],
+  providers: [
+    AuthService,
+    JwtParamStrategy,
+    AccessJwtCookieStrategy,
+    RefreshJwtCookieStrategy,
+  ],
   controllers: [AuthController],
 })
 export class AuthModule {}
