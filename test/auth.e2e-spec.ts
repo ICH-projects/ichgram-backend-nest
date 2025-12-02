@@ -8,6 +8,8 @@ import { getModelToken } from '@nestjs/sequelize';
 import { Sequelize } from 'sequelize-typescript';
 import cookieParser from 'cookie-parser';
 import Cookies from 'expect-cookies';
+import Cookies2 from 'js-cookie';
+import * as cookie from 'cookie';
 
 import { AppModule } from '../src/app.module';
 import { DBConstraintExceptionFilter } from '../src/filters/DBConstraintException.filter';
@@ -19,6 +21,7 @@ describe('AUTH (e2e)', () => {
   const confirmEmailPath = `/v${version}/api/auth/confirm`;
   const loginPath = `/v${version}/api/auth/login`;
   const logoutPath = `/v${version}/api/auth/logout`;
+  const refreshPath = `/v${version}/api/auth/refresh`;
 
   let app: INestApplication;
   let sequelize: Sequelize;
@@ -350,7 +353,7 @@ describe('AUTH (e2e)', () => {
     });
   });
 
-  describe.only('LOGOUT', () => {
+  describe('LOGOUT', () => {
     const validBody = { email: 'zolotukhinpv@i.ua', password: 'passWord1%' };
 
     beforeEach(async () => {
@@ -409,6 +412,82 @@ describe('AUTH (e2e)', () => {
         .set('Cookie', 'accessToken=ffffffffffffffff')
         .expect(401);
       expect(logoutResponse.body.message).toBe(`Unauthorized`);
+    });
+  });
+
+  describe('REFRESH', () => {
+    const validBody = { email: 'zolotukhinpv@i.ua', password: 'passWord1%' };
+    let reqCookie: cookie.SetCookie[];
+    let reqRefreshTokenCookie: cookie.SetCookie;
+    let reqAccessTokenCookie: cookie.SetCookie;
+
+    beforeEach(async () => {
+      await agent.post(signupPath).send(validBody).expect(201);
+
+      const token: string = await jwtService.signAsync(
+        { email: validBody.email },
+        { expiresIn: '15m', secret: process.env.JWT_SECRET },
+      );
+
+      await agent.get(confirmEmailPath).query({ token }).expect(200);
+
+      const loginResponse = await agent
+        .post(loginPath)
+        .send(validBody)
+        .expect(200);
+
+      reqCookie = Array.from(loginResponse.get('Set-Cookie') || []).map((c) =>
+        cookie.parseSetCookie(c),
+      ) as cookie.SetCookie[];
+      reqRefreshTokenCookie = reqCookie.find(
+        (c) => c.name === 'refreshToken',
+      ) as cookie.SetCookie;
+      reqAccessTokenCookie = reqCookie.find(
+        (c) => c.name === 'accessToken',
+      ) as cookie.SetCookie;
+    });
+
+    it(`should refresh tokens successfully`, async () => {
+      await new Promise((res) => setTimeout(res, 500));
+      const refreshResponse = await agent.get(refreshPath).expect(200);
+
+      const resCookie = Array.from(refreshResponse.get('Set-Cookie') || []).map(
+        (c) => cookie.parseSetCookie(c),
+      ) as cookie.SetCookie[];
+      const resRefreshTokenCookie = resCookie.find(
+        (c) => c.name === 'refreshToken',
+      ) as cookie.SetCookie;
+      const resAccessTokenCookie = resCookie.find(
+        (c) => c.name === 'accessToken',
+      ) as cookie.SetCookie;
+
+      expect(resRefreshTokenCookie.expires).not.toBe(reqRefreshTokenCookie.expires);
+      expect(resAccessTokenCookie.expires).not.toBe(reqAccessTokenCookie.expires);
+      expect(refreshResponse.body.message).toBe(`Tokens successfully updated`);
+    });
+
+    it(`should fail when user not found`, async () => {
+      const userModel = app.get<typeof User>(getModelToken(User));
+      await userModel.destroy({ where: { email: validBody.email } });
+      const refreshResponse = await agent.get(refreshPath).expect(404);
+      expect(refreshResponse.body.message).toBe(
+        `User with email: ${validBody.email} not found`,
+      );
+    });
+
+    it(`should fail when refreshToken not exists in cookie`, async () => {
+      const refreshResponse = await request(app.getHttpServer())
+        .get(refreshPath)
+        .expect(401);
+      expect(refreshResponse.body.message).toBe(`Unauthorized`);
+    });
+
+    it(`should fail when accessToken not valid`, async () => {
+      const refreshResponse = await request(app.getHttpServer())
+        .get(refreshPath)
+        .set('Cookie', 'accessToken=ffffffffffffffff')
+        .expect(401);
+      expect(refreshResponse.body.message).toBe(`Unauthorized`);
     });
   });
 });

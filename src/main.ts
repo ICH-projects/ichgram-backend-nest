@@ -9,6 +9,7 @@ import { HttpValidationExceptionFilter } from './filters/HttpValidationException
 import { DBConstraintExceptionFilter } from './filters/DBConstraintException.filter';
 
 import { version } from '../package.json';
+import { access } from 'fs';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -30,11 +31,16 @@ async function bootstrap() {
     .setTitle('ichgram API')
     .setDescription('API documentation')
     .setVersion(version)
-    // .addCookieAuth("accessToken")
+    .addCookieAuth('accessToken', { type: 'apiKey', in: 'cookie' })
+    .addCookieAuth('refreshToken', { type: 'apiKey', in: 'cookie' })
     .build();
 
   const document = SwaggerModule.createDocument(app, config);
-  SwaggerModule.setup('api', app, document);
+  SwaggerModule.setup('api', app, document, {
+    swaggerOptions: {
+      withCredentials: true,
+    },
+  });
 
   await app.listen(process.env.PORT ?? 3000);
 }

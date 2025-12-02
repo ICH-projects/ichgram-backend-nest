@@ -108,6 +108,21 @@ export class AuthService {
     await Session.destroy({ where: { userId: user.id } });
   }
 
+  async refreshTokens(email: string) {
+    const user = await User.findOne({ where: { email } });
+    if (!user)
+      throw new HttpException(
+        `User with email: ${email} not found`,
+        HttpStatus.NOT_FOUND,
+      );
+    await Session.destroy({ where: { userId: user.id } });
+    const { accessToken, refreshToken } = await this.createToken({
+      email: user.email,
+    });
+    await Session.create({ userId: user.id, accessToken, refreshToken });
+    return { accessToken, refreshToken };
+  }
+
   private async createToken(payload: Record<string, string>) {
     const accessToken: string = await this.jwtService.signAsync(payload, {
       expiresIn: '60m',

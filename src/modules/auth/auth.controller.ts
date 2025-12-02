@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  Header,
   HttpCode,
   HttpStatus,
   Post,
@@ -16,6 +17,7 @@ import {
   ApiConflictResponse,
   ApiCookieAuth,
   ApiForbiddenResponse,
+  ApiHeader,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
@@ -217,12 +219,12 @@ export class AuthController {
     description: 'login successfully.',
     headers: {
       'Set-Cookie': {
-        description: 'Returns accessToken & refreshToken cookies.',
+        description: 'access token',
         schema: {
           type: 'string',
           example:
-            'accessToken=abc123; HttpOnly; Path=/; Max-Age=3600000\n' +
-            'refreshToken=xyz456; HttpOnly; Path=/; Max-Age=604800000',
+            'accessToken=V7wmyyuivzpbnkhYEc5_SmyjN53ZZQ6EnCQZRjI; Max-Age=3600; Path=/; Expires=Tue, 02 Dec 2025 17:40:51 GMT; HttpOnly; SameSite=Lax\n' +
+            'refreshToken=V7wmyyuivzpbnkhYEc5_SmyjN53ZZQ6EnCQZRjI; Max-Age=3600; Path=/; Expires=Tue, 02 Dec 2025 17:40:51 GMT; HttpOnly; SameSite=Lax\n',
         },
       },
     },
@@ -310,7 +312,11 @@ export class AuthController {
     } as AuthResponseDto;
   }
 
-  @ApiOperation({ summary: 'logout user' })
+  @ApiOperation({
+    summary: 'logout user',
+    description:
+      'logout user and clear tokens (accessToken, refreshToken) if valid accessToken exists in cookie',
+  })
   @ApiCookieAuth('accessToken')
   @ApiOkResponse({
     type: AuthResponseDto,
@@ -356,17 +362,91 @@ export class AuthController {
   })
   @Get('logout')
   @HttpCode(HttpStatus.OK)
-  @UseGuards(new AccessJwtAuthGuard("access_jwt_cookie"))
+  @UseGuards(new AccessJwtAuthGuard('access_jwt_cookie'))
   async logout(
     @User('email') userEmail: string,
     @Res({ passthrough: true }) res: Response,
-    @Req() req: Request,
   ) {
     await this.authService.logout(userEmail);
     this.clearAuthCookies(res);
     return {
       payload: null,
       message: 'Logout successfully',
+    } as AuthResponseDto;
+  }
+
+  @ApiOperation({
+    summary: 'refresh tokens',
+    description:
+      'refresh tokens (accessToken, refreshToken) if valid refreshToken exists in cookie',
+  })
+  @ApiCookieAuth('refreshToken')
+  @ApiOkResponse({
+    type: AuthResponseDto,
+    description: 'Tokens successfully updated.',
+    example: {
+      payload: null,
+      message: 'Tokens successfully updated',
+    },
+    headers: {
+      'Set-Cookie': {
+        description: 'access token',
+        schema: {
+          type: 'string',
+          example:
+            'accessToken=V7wmyyuivzpbnkhYEc5_SmyjN53ZZQ6EnCQZRjI; Max-Age=3600; Path=/; Expires=Tue, 02 Dec 2025 17:40:51 GMT; HttpOnly; SameSite=Lax\n' +
+            'refreshToken=V7wmyyuivzpbnkhYEc5_SmyjN53ZZQ6EnCQZRjI; Max-Age=3600; Path=/; Expires=Tue, 02 Dec 2025 17:40:51 GMT; HttpOnly; SameSite=Lax\n',
+        },
+      },
+    },
+  })
+  @ApiNotFoundResponse({
+    type: ExceptionResponseDto,
+    description: 'Fail when user not found',
+    example: {
+      statusCode: HttpStatus.NOT_FOUND,
+      timestamp: new Date().toISOString(),
+      path: '/api/auth/refresh',
+      message: 'User with email: someemail@example.com not found',
+    },
+  })
+  @ApiUnauthorizedResponse({
+    type: ExceptionResponseDto,
+    description: 'token not valid or not exists',
+    examples: {
+      a: {
+        summary: 'token not valid',
+        value: {
+          statusCode: 401,
+          timestamp: '2025-11-28T19:44:42.437Z',
+          path: '/v1/api/auth/refresh',
+          message: 'Unauthorized',
+        },
+      },
+      b: {
+        summary: 'token is not exists',
+        value: {
+          statusCode: 401,
+          timestamp: '2025-11-28T19:44:42.437Z',
+          path: '/v1/api/auth/refresh',
+          message: 'Unauthorized',
+        },
+      },
+    },
+  })
+  @Get('refresh')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(new RefreshJwtAuthGuard('refresh_jwt_cookie'))
+  async refresh(
+    @User('email') userEmail: string,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    const { accessToken, refreshToken } =
+      await this.authService.refreshTokens(userEmail);
+    this.setAuthCookies(res, accessToken, refreshToken);
+    return {
+      payload: null,
+      message: 'Tokens successfully updated',
     } as AuthResponseDto;
   }
 
@@ -379,7 +459,7 @@ export class AuthController {
       .cookie('accessToken', accessToken, {
         httpOnly: true,
         path: '/',
-        maxAge:  60 * 60 * 1000,
+        maxAge: 60 * 60 * 1000,
         sameSite: 'lax',
       })
       .cookie('refreshToken', refreshToken, {
