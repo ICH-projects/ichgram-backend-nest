@@ -78,7 +78,6 @@ describe('AUTH (e2e)', () => {
     it(`should fail when a duplicate email`, async () => {
       const body = { email: 'zolotukhinpv@i.ua', password: 'passWord1%' };
       await userModel.create(body);
-      await userModel.create(body);
 
       const response = await request(app.getHttpServer())
         .post(signupPath)
@@ -138,7 +137,6 @@ describe('AUTH (e2e)', () => {
     it(`should confirm email successfully`, async () => {
       const body = { email: 'zolotukhinpv@i.ua', password: 'passWord1%' };
       await userModel.create(body);
-      await userModel.create(body);
 
       const token: string = await jwtService.signAsync(
         {
@@ -159,7 +157,6 @@ describe('AUTH (e2e)', () => {
     it(`should fail when token is missing`, async () => {
       const body = { email: 'zolotukhinpv@i.ua', password: 'passWord1%' };
       await userModel.create(body);
-      await userModel.create(body);
 
       const response = await request(app.getHttpServer())
         .get(confirmEmailPath)
@@ -175,8 +172,6 @@ describe('AUTH (e2e)', () => {
 
       await userModel.create(body);
 
-      await userModel.create(body);
-
       const response = await request(app.getHttpServer())
         .get(confirmEmailPath)
         .query({ token })
@@ -189,7 +184,6 @@ describe('AUTH (e2e)', () => {
     it(`should fail when token is wrong`, async () => {
       const body = { email: 'zolotukhinpv@i.ua', password: 'passWord1%' };
       const wrongEmail = 'zolotukhinpv2@i.ua';
-      await userModel.create(body);
       await userModel.create(body);
 
       const token: string = await jwtService.signAsync(
