@@ -44,6 +44,8 @@ describe('AUTH (e2e)', () => {
 
     userModel = app.get<typeof User>(getModelToken(User));
 
+    userModel = app.get<typeof User>(getModelToken(User));
+
     agent = request.agent(app.getHttpServer());
 
     jwtService = moduleRef.get<JwtService>(JwtService);
@@ -75,6 +77,7 @@ describe('AUTH (e2e)', () => {
 
     it(`should fail when a duplicate email`, async () => {
       const body = { email: 'zolotukhinpv@i.ua', password: 'passWord1%' };
+      await userModel.create(body);
       await userModel.create(body);
 
       const response = await request(app.getHttpServer())
@@ -135,6 +138,7 @@ describe('AUTH (e2e)', () => {
     it(`should confirm email successfully`, async () => {
       const body = { email: 'zolotukhinpv@i.ua', password: 'passWord1%' };
       await userModel.create(body);
+      await userModel.create(body);
 
       const token: string = await jwtService.signAsync(
         {
@@ -155,6 +159,7 @@ describe('AUTH (e2e)', () => {
     it(`should fail when token is missing`, async () => {
       const body = { email: 'zolotukhinpv@i.ua', password: 'passWord1%' };
       await userModel.create(body);
+      await userModel.create(body);
 
       const response = await request(app.getHttpServer())
         .get(confirmEmailPath)
@@ -170,6 +175,8 @@ describe('AUTH (e2e)', () => {
 
       await userModel.create(body);
 
+      await userModel.create(body);
+
       const response = await request(app.getHttpServer())
         .get(confirmEmailPath)
         .query({ token })
@@ -182,6 +189,7 @@ describe('AUTH (e2e)', () => {
     it(`should fail when token is wrong`, async () => {
       const body = { email: 'zolotukhinpv@i.ua', password: 'passWord1%' };
       const wrongEmail = 'zolotukhinpv2@i.ua';
+      await userModel.create(body);
       await userModel.create(body);
 
       const token: string = await jwtService.signAsync(
@@ -294,6 +302,7 @@ describe('AUTH (e2e)', () => {
       const response = await request(app.getHttpServer())
         .post(loginPath)
         .send(body)
+        .send(body)
         .expect(404);
 
       expect(response.body.message).toBe(`Email or password invalid`);
@@ -302,6 +311,7 @@ describe('AUTH (e2e)', () => {
     it(`should fail when password wrong`, async () => {
       const response = await request(app.getHttpServer())
         .post(loginPath)
+        .send({ ...validBody, password: 'passWord2%' })
         .send({ ...validBody, password: 'passWord2%' })
         .expect(404);
 
@@ -401,6 +411,12 @@ describe('AUTH (e2e)', () => {
         (c) => c.name === 'accessToken',
       ) as cookie.SetCookie;
 
+      expect(resRefreshTokenCookie.expires).not.toBe(
+        reqRefreshTokenCookie.expires,
+      );
+      expect(resAccessTokenCookie.expires).not.toBe(
+        reqAccessTokenCookie.expires,
+      );
       expect(resRefreshTokenCookie.expires).not.toBe(
         reqRefreshTokenCookie.expires,
       );
