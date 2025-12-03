@@ -44,6 +44,8 @@ describe('AUTH (e2e)', () => {
 
     userModel = app.get<typeof User>(getModelToken(User));
 
+    userModel = app.get<typeof User>(getModelToken(User));
+
     agent = request.agent(app.getHttpServer());
 
     jwtService = moduleRef.get<JwtService>(JwtService);
@@ -294,6 +296,7 @@ describe('AUTH (e2e)', () => {
       const response = await request(app.getHttpServer())
         .post(loginPath)
         .send(body)
+        .send(body)
         .expect(404);
 
       expect(response.body.message).toBe(`Email or password invalid`);
@@ -302,6 +305,7 @@ describe('AUTH (e2e)', () => {
     it(`should fail when password wrong`, async () => {
       const response = await request(app.getHttpServer())
         .post(loginPath)
+        .send({ ...validBody, password: 'passWord2%' })
         .send({ ...validBody, password: 'passWord2%' })
         .expect(404);
 
@@ -401,6 +405,12 @@ describe('AUTH (e2e)', () => {
         (c) => c.name === 'accessToken',
       ) as cookie.SetCookie;
 
+      expect(resRefreshTokenCookie.expires).not.toBe(
+        reqRefreshTokenCookie.expires,
+      );
+      expect(resAccessTokenCookie.expires).not.toBe(
+        reqAccessTokenCookie.expires,
+      );
       expect(resRefreshTokenCookie.expires).not.toBe(
         reqRefreshTokenCookie.expires,
       );
