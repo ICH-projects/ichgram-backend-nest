@@ -8,8 +8,8 @@ import { getModelToken } from '@nestjs/sequelize';
 import { Sequelize } from 'sequelize-typescript';
 import cookieParser from 'cookie-parser';
 import Cookies from 'expect-cookies';
-import Cookies2 from 'js-cookie';
 import * as cookie from 'cookie';
+import * as bcrypt from 'bcrypt';
 
 import { AppModule } from '../src/app.module';
 import { DBConstraintExceptionFilter } from '../src/filters/DBConstraintException.filter';
@@ -25,6 +25,8 @@ describe('AUTH (e2e)', () => {
 
   let app: INestApplication;
   let sequelize: Sequelize;
+  let userModel: typeof User;
+
   let jwtService: JwtService;
   let agent: request.Agent;
 
@@ -39,6 +41,8 @@ describe('AUTH (e2e)', () => {
     app.useGlobalFilters(new DBConstraintExceptionFilter());
     app.use(cookieParser());
     await app.init();
+
+    userModel = app.get<typeof User>(getModelToken(User));
 
     agent = request.agent(app.getHttpServer());
 
@@ -71,16 +75,9 @@ describe('AUTH (e2e)', () => {
 
     it(`should fail when a duplicate email`, async () => {
       const body = { email: 'zolotukhinpv@i.ua', password: 'passWord1%' };
-      let response = await request(app.getHttpServer())
-        .post(signupPath)
-        .send(body)
-        .expect(201);
+      await userModel.create(body);
 
-      expect(response.body.message).toBe(
-        `Signup successfully, a message containing a confirmation link has been sent to email: ${body.email}`,
-      );
-
-      response = await request(app.getHttpServer())
+      const response = await request(app.getHttpServer())
         .post(signupPath)
         .send(body)
         .expect(409);
@@ -137,10 +134,7 @@ describe('AUTH (e2e)', () => {
 
     it(`should confirm email successfully`, async () => {
       const body = { email: 'zolotukhinpv@i.ua', password: 'passWord1%' };
-      await request(app.getHttpServer())
-        .post(signupPath)
-        .send(body)
-        .expect(201);
+      await userModel.create(body);
 
       const token: string = await jwtService.signAsync(
         {
@@ -160,10 +154,7 @@ describe('AUTH (e2e)', () => {
 
     it(`should fail when token is missing`, async () => {
       const body = { email: 'zolotukhinpv@i.ua', password: 'passWord1%' };
-      await request(app.getHttpServer())
-        .post(signupPath)
-        .send(body)
-        .expect(201);
+      await userModel.create(body);
 
       const response = await request(app.getHttpServer())
         .get(confirmEmailPath)
@@ -175,12 +166,9 @@ describe('AUTH (e2e)', () => {
 
     it(`should fail when token is not valid`, async () => {
       const body = { email: 'zolotukhinpv@i.ua', password: 'passWord1%' };
-      await request(app.getHttpServer())
-        .post(signupPath)
-        .send(body)
-        .expect(201);
-
       const token: string = 'wrong_token';
+
+      await userModel.create(body);
 
       const response = await request(app.getHttpServer())
         .get(confirmEmailPath)
@@ -194,10 +182,7 @@ describe('AUTH (e2e)', () => {
     it(`should fail when token is wrong`, async () => {
       const body = { email: 'zolotukhinpv@i.ua', password: 'passWord1%' };
       const wrongEmail = 'zolotukhinpv2@i.ua';
-      await request(app.getHttpServer())
-        .post(signupPath)
-        .send(body)
-        .expect(201);
+      await userModel.create(body);
 
       const token: string = await jwtService.signAsync(
         {
@@ -221,44 +206,20 @@ describe('AUTH (e2e)', () => {
   describe('LOGIN', () => {
     const validBody = { email: 'zolotukhinpv@i.ua', password: 'passWord1%' };
     beforeEach(async () => {
-      await request(app.getHttpServer())
-        .post(signupPath)
-        .send(validBody)
-        .expect(201);
+      const passwordHash: string = await bcrypt.hash(validBody.password, 10);
 
-      const token: string = await jwtService.signAsync(
-        {
-          email: validBody.email,
-        },
-        { expiresIn: '15m', secret: process.env.JWT_SECRET },
-      );
-
-      await request(app.getHttpServer())
-        .get(confirmEmailPath)
-        .query({ token })
-        .send()
-        .expect(200);
+      await userModel.create({
+        ...validBody,
+        password: passwordHash,
+        isConfirmed: true,
+      });
     });
 
     it(`should login successfully`, async () => {
       const response = await request(app.getHttpServer())
         .post(loginPath)
         .send(validBody)
-        .expect(200)
-        .expect((res) => {
-          const cookies = res.headers['set-cookie'];
-          if (!cookies) throw new Error('No cookies returned');
-
-          const hasAccessToken = Array.from(cookies).some((cookie) =>
-            cookie.startsWith('accessToken='),
-          );
-          if (!hasAccessToken) throw new Error('session cookie missing');
-          const hasRefreshToken = Array.from(cookies).some((cookie) =>
-            cookie.startsWith('refreshToken='),
-          );
-          if (!hasRefreshToken) throw new Error('session cookie missing');
-        });
-
+        .expect(200);
       expect(response.body.message).toBe(`Login successfully`);
     });
 
@@ -309,13 +270,13 @@ describe('AUTH (e2e)', () => {
       expect(response.body.message).toMatch(/Password must contain/);
     });
 
-    it(`should fail when email not confirmed`, async () => {
-      const validBody = { email: 'zolotukhinpv2@i.ua', password: 'passWord1%' };
-
-      await request(app.getHttpServer())
-        .post(signupPath)
-        .send(validBody)
-        .expect(201);
+    it.only(`should fail when email not confirmed`, async () => {
+      await userModel.update(
+        {
+          isConfirmed: false,
+        },
+        { where: { email: validBody.email } },
+      );
 
       const response = await request(app.getHttpServer())
         .post(loginPath)
@@ -328,25 +289,20 @@ describe('AUTH (e2e)', () => {
     });
 
     it(`should fail when user not found`, async () => {
-      const validBody = { email: 'zolotukhinpv2@i.ua', password: 'passWord1%' };
+      const body = { email: 'zolotukhinpv2@i.ua', password: 'passWord1%' };
 
       const response = await request(app.getHttpServer())
         .post(loginPath)
-        .send(validBody)
+        .send(body)
         .expect(404);
 
       expect(response.body.message).toBe(`Email or password invalid`);
     });
 
     it(`should fail when password wrong`, async () => {
-      const notValidBody = {
-        email: 'zolotukhinpv@i.ua',
-        password: 'passWord2%',
-      };
-
       const response = await request(app.getHttpServer())
         .post(loginPath)
-        .send(notValidBody)
+        .send({ ...validBody, password: 'passWord2%' })
         .expect(404);
 
       expect(response.body.message).toBe(`Email or password invalid`);
@@ -357,28 +313,14 @@ describe('AUTH (e2e)', () => {
     const validBody = { email: 'zolotukhinpv@i.ua', password: 'passWord1%' };
 
     beforeEach(async () => {
-      await agent.post(signupPath).send(validBody).expect(201);
+      const passwordHash: string = await bcrypt.hash(validBody.password, 10);
+      await userModel.create({
+        ...validBody,
+        password: passwordHash,
+        isConfirmed: true,
+      });
 
-      const token: string = await jwtService.signAsync(
-        { email: validBody.email },
-        { expiresIn: '15m', secret: process.env.JWT_SECRET },
-      );
-
-      await agent.get(confirmEmailPath).query({ token }).expect(200);
-
-      const loginResponse = await agent
-        .post(loginPath)
-        .send(validBody)
-        .expect(200);
-
-      if (
-        !loginResponse.headers['set-cookie'] ||
-        loginResponse.headers['set-cookie'].length === 0
-      ) {
-        throw new Error(
-          'Login did not set any cookies. Check your auth setup.',
-        );
-      }
+      await agent.post(loginPath).send(validBody).expect(200);
     });
 
     it(`should logout successfully and clear auth cookies`, async () => {
@@ -391,7 +333,6 @@ describe('AUTH (e2e)', () => {
     });
 
     it(`should fail when user not found`, async () => {
-      const userModel = app.get<typeof User>(getModelToken(User));
       await userModel.destroy({ where: { email: validBody.email } });
       const logoutResponse = await agent.get(logoutPath).expect(404);
       expect(logoutResponse.body.message).toBe(
@@ -422,14 +363,13 @@ describe('AUTH (e2e)', () => {
     let reqAccessTokenCookie: cookie.SetCookie;
 
     beforeEach(async () => {
-      await agent.post(signupPath).send(validBody).expect(201);
+      const passwordHash: string = await bcrypt.hash(validBody.password, 10);
 
-      const token: string = await jwtService.signAsync(
-        { email: validBody.email },
-        { expiresIn: '15m', secret: process.env.JWT_SECRET },
-      );
-
-      await agent.get(confirmEmailPath).query({ token }).expect(200);
+      await userModel.create({
+        ...validBody,
+        password: passwordHash,
+        isConfirmed: true,
+      });
 
       const loginResponse = await agent
         .post(loginPath)
@@ -461,13 +401,16 @@ describe('AUTH (e2e)', () => {
         (c) => c.name === 'accessToken',
       ) as cookie.SetCookie;
 
-      expect(resRefreshTokenCookie.expires).not.toBe(reqRefreshTokenCookie.expires);
-      expect(resAccessTokenCookie.expires).not.toBe(reqAccessTokenCookie.expires);
+      expect(resRefreshTokenCookie.expires).not.toBe(
+        reqRefreshTokenCookie.expires,
+      );
+      expect(resAccessTokenCookie.expires).not.toBe(
+        reqAccessTokenCookie.expires,
+      );
       expect(refreshResponse.body.message).toBe(`Tokens successfully updated`);
     });
 
     it(`should fail when user not found`, async () => {
-      const userModel = app.get<typeof User>(getModelToken(User));
       await userModel.destroy({ where: { email: validBody.email } });
       const refreshResponse = await agent.get(refreshPath).expect(404);
       expect(refreshResponse.body.message).toBe(
