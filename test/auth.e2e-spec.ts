@@ -18,10 +18,11 @@ import { User } from '../src/modules/auth/models/user.model';
 describe('AUTH (e2e)', () => {
   const version: string = '1';
   const signupPath = `/v${version}/api/auth/signup`;
-  const confirmEmailPath = `/v${version}/api/auth/confirm`;
+  const confirmEmailPath = `/v${version}/api/auth/confirm-email`;
   const loginPath = `/v${version}/api/auth/login`;
   const logoutPath = `/v${version}/api/auth/logout`;
   const refreshPath = `/v${version}/api/auth/refresh`;
+  const resetPasswordPath = `/v${version}/api/auth/reset-password`;
 
   let app: INestApplication;
   let sequelize: Sequelize;
@@ -441,6 +442,66 @@ describe('AUTH (e2e)', () => {
         .set('Cookie', 'accessToken=ffffffffffffffff')
         .expect(401);
       expect(refreshResponse.body.message).toBe(`Unauthorized`);
+    });
+  });
+
+  describe('RESET_PASSWORD & CONFIRM_UPDATE_PASSWORD', () => {
+    const validBody = { email: 'zolotukhinpv@i.ua', password: 'passWord1%' };
+
+    beforeEach(async () => {
+      await userModel.create({
+        ...validBody,
+      });
+    });
+
+    it(`should sign up successfully with valid credentials`, async () => {
+      const body = { email: 'zolotukhinpv@i.ua' };
+      const response = await request(app.getHttpServer())
+        .post(resetPasswordPath)
+        .send(body)
+        .expect(200);
+
+      expect(response.body.message).toBe(
+        `Reset password. A message containing a confirmation link has been sent to email: ${body.email}`,
+      );
+    });
+
+    it(`should fail when request body is empty`, async () => {
+      const body = undefined;
+      const response = await request(app.getHttpServer())
+        .post(resetPasswordPath)
+        .send(body)
+        .expect(400);
+
+      expect(response.body.message).toBe(
+        `✖ Invalid input: expected object, received undefined`,
+      );
+    });
+
+    it(`should fail when email format is invalid`, async () => {
+      const body = { email: 'wrongemail' };
+
+      const response = await request(app.getHttpServer())
+        .post(resetPasswordPath)
+        .send(body)
+        .expect(400);
+
+      expect(response.body.message).toMatch(
+        /Please enter a valid email address/,
+      );
+    });
+
+    it(`should fail when user not found`, async () => {
+      const body = { email: 'wrongemail@example.com' };
+
+      const response = await request(app.getHttpServer())
+        .post(resetPasswordPath)
+        .send(body)
+        .expect(404);
+
+      expect(response.body.message).toMatch(
+        `User with email: ${body.email} not found`,
+      );
     });
   });
 });

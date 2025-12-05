@@ -27,7 +27,12 @@ import {
   ApiUnauthorizedResponse,
 } from '@nestjs/swagger';
 
-import { loginSchema, signupSchema } from './validation/auth.schemes';
+import {
+  loginSchema,
+  signupSchema,
+  passwordSchema,
+  emailSchema,
+} from './validation/auth.schemes';
 import { SignupDto } from './dto/Signup.dto';
 import { LoginDto } from './dto/Login.dto';
 import { AuthResponseDto } from './dto/AuthResponse.dto';
@@ -44,7 +49,8 @@ import { User } from './decorators/User.decorator';
 
 import { AuthService } from './auth.service';
 import type { Response } from 'express';
-import { Request } from '@nestjs/common';
+import { UpdatePasswordDto } from './dto/UpdatePassword.dto';
+import { EmailDto } from './dto/Email.dto';
 
 @ApiTags('Auth')
 @Controller({ path: 'api/auth', version: '1' })
@@ -190,7 +196,7 @@ export class AuthController {
     },
   })
   @UseGuards(ParamJwtAuthGuard)
-  @Get('confirm')
+  @Get('confirm-email')
   @HttpCode(HttpStatus.OK)
   async confirmEmail(@User('email') userEmail: string) {
     const message = await this.authService.confirmEmail(userEmail);
@@ -450,6 +456,65 @@ export class AuthController {
     } as AuthResponseDto;
   }
 
+  @ApiOperation({
+    summary: 'request to reset password',
+  })
+  @ApiBody({
+    type: [EmailDto],
+    required: true,
+    examples: {
+      a: {
+        summary: 'Example with valid body',
+        value: {
+          email: 'someemail@example.com',
+        } as EmailDto,
+      },
+    },
+  })
+  @ApiNotFoundResponse({
+    type: ExceptionResponseDto,
+    description: 'Fail when user not found',
+    example: {
+      statusCode: HttpStatus.NOT_FOUND,
+      timestamp: new Date().toISOString(),
+      path: '/api/auth/reset-password',
+      message: 'User with email: someemail@example.com not found',
+    },
+  })
+  @ApiBadRequestResponse({
+    type: ExceptionResponseDto,
+    description: 'Fail when request body invalid',
+    examples: {
+      a: {
+        summary: 'request body is empty',
+        value: {
+          statusCode: HttpStatus.BAD_REQUEST,
+          timestamp: new Date().toISOString(),
+          path: '/api/auth/reset-password',
+          message: 'Invalid input: expected object, received undefined',
+        },
+      },
+      b: {
+        summary: 'email format is invalid',
+        value: {
+          statusCode: HttpStatus.BAD_REQUEST,
+          timestamp: new Date().toISOString(),
+          path: '/api/auth/reset-password',
+          message: 'Please enter a valid email address',
+        },
+      },
+    },
+  })
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  @UsePipes(new ZodValidationPipe(emailSchema))
+  async resetPassword(@Body() emailDto: EmailDto) {
+    const message = await this.authService.resetPassword(emailDto.email);
+    return {
+      payload: null,
+      message,
+    } as AuthResponseDto;
+  }
   private setAuthCookies(
     res: Response,
     accessToken: string,

@@ -9,7 +9,9 @@ import { MailService } from '../mail/mail.service';
 
 import { LoginDto } from './dto/Login.dto';
 import { SignupDto } from './dto/Signup.dto';
+
 import { Session } from './models/session.model';
+import { MAIL_TYPES, mailTemplates } from './constants/MailTypes';
 
 @Injectable()
 export class AuthService {
@@ -33,7 +35,11 @@ export class AuthService {
           email: signupDto.email,
         });
 
-        await this.sendConfirmationEmail([signupDto.email], confirmationToken);
+        await this.sendConfirmationEmail(
+          [signupDto.email],
+          confirmationToken,
+          MAIL_TYPES.SignupConfirmation,
+        );
       });
     } catch (error) {
       throw error;
@@ -79,7 +85,11 @@ export class AuthService {
         email: loginDto.email,
       });
 
-      await this.sendConfirmationEmail([loginDto.email], confirmationToken);
+      await this.sendConfirmationEmail(
+        [loginDto.email],
+        confirmationToken,
+        MAIL_TYPES.SignupConfirmation,
+      );
 
       throw new HttpException(
         `Email not confirmed, a message containing a confirmation link has been sent to email: ${loginDto.email}`,
@@ -123,6 +133,48 @@ export class AuthService {
     return { accessToken, refreshToken };
   }
 
+  async resetPassword(email: string): Promise<string> {
+    const user = await User.findOne({ where: { email } });
+    if (!user)
+      throw new HttpException(
+        `User with email: ${email} not found`,
+        HttpStatus.NOT_FOUND,
+      );
+    const { confirmationToken } = await this.createToken({ email });
+
+    await this.sendConfirmationEmail(
+      [email],
+      confirmationToken,
+      MAIL_TYPES.ResetPasswordConfirmation,
+    );
+
+    return `Reset password. A message containing a confirmation link has been sent to email: ${email}`;
+  }
+
+  async updatePassword(email: string, newPassword: string): Promise<string> {
+    const user = await User.findOne({ where: { email } });
+    if (!user)
+      throw new HttpException(
+        `User with email: ${email} not found`,
+        HttpStatus.BAD_REQUEST,
+      );
+    const passwordHash: string = await bcrypt.hash(newPassword, 10);
+
+    await user.update({ password: passwordHash });
+    return `Password successfully updated`;
+  }
+
+  async deleteUser(userEmail: string): Promise<string> {
+    const user = await User.findOne({ where: { email: userEmail } });
+    if (!user)
+      throw new HttpException(
+        `User with email: ${userEmail} not found`,
+        HttpStatus.BAD_REQUEST,
+      );
+    await user.destroy();
+    return `User successfully deleted`;
+  }
+
   private async createToken(payload: Record<string, string>) {
     const accessToken: string = await this.jwtService.signAsync(payload, {
       expiresIn: '60m',
@@ -142,14 +194,15 @@ export class AuthService {
   private async sendConfirmationEmail(
     emailsList: string[],
     confirmationToken: string,
+    emailType: MAIL_TYPES,
   ) {
     await this.mailService.sendEmail({
       emailsList,
       subject: `Welcome to ${process.env.APP}`,
-      template: 'signup-confirmation-email',
+      template: mailTemplates[emailType].template,
       context: {
         name: 'user',
-        verificationLink: `${process.env.FRONTEND_BASE_URL}/auth/confirm?token=${confirmationToken}`,
+        verificationLink: `${process.env.FRONTEND_BASE_URL}/${mailTemplates[emailType].link}?token=${confirmationToken}`,
       },
     });
   }
