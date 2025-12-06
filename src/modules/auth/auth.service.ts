@@ -156,7 +156,7 @@ export class AuthService {
     if (!user)
       throw new HttpException(
         `User with email: ${email} not found`,
-        HttpStatus.BAD_REQUEST,
+        HttpStatus.NOT_FOUND,
       );
     const passwordHash: string = await bcrypt.hash(newPassword, 10);
 

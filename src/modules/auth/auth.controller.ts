@@ -135,8 +135,7 @@ export class AuthController {
   })
   @Post('signup')
   @HttpCode(HttpStatus.CREATED)
-  @UsePipes(new ZodValidationPipe(signupSchema))
-  async signup(@Body() signupDto: SignupDto): Promise<AuthResponseDto> {
+  async signup(@Body(new ZodValidationPipe(signupSchema)) signupDto: SignupDto): Promise<AuthResponseDto> {
     const message = await this.authService.signup(signupDto);
     return {
       payload: null,
@@ -304,9 +303,8 @@ export class AuthController {
   })
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  @UsePipes(new ZodValidationPipe(loginSchema))
   async login(
-    @Body() loginDto: LoginDto,
+    @Body(new ZodValidationPipe(loginSchema)) loginDto: LoginDto,
     @Res({ passthrough: true }) res: Response,
   ) {
     const { accessToken, refreshToken } =
@@ -471,6 +469,14 @@ export class AuthController {
       },
     },
   })
+  @ApiOkResponse({
+    type: AuthResponseDto,
+    example: {
+      payload: null,
+      message:
+        'Reset password. A message containing a confirmation link has been sent to email: someemail@example.com',
+    },
+  })
   @ApiNotFoundResponse({
     type: ExceptionResponseDto,
     description: 'Fail when user not found',
@@ -507,14 +513,90 @@ export class AuthController {
   })
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
-  @UsePipes(new ZodValidationPipe(emailSchema))
-  async resetPassword(@Body() emailDto: EmailDto) {
+  async resetPassword(@Body(new ZodValidationPipe(emailSchema)) emailDto: EmailDto) {
     const message = await this.authService.resetPassword(emailDto.email);
     return {
       payload: null,
       message,
     } as AuthResponseDto;
   }
+
+  @ApiOperation({
+    summary: 'update password',
+  })
+  @ApiBody({
+    type: [UpdatePasswordDto],
+    required: true,
+    examples: {
+      a: {
+        summary: 'Example with valid body',
+        value: {
+          password: 'passWord%1',
+        } as UpdatePasswordDto,
+      },
+    },
+  })
+  @ApiOkResponse({
+    type: AuthResponseDto,
+    description: 'Password successfully updated.',
+    example: {
+      payload: null,
+      message: 'Password successfully updated',
+    },
+  })
+  @ApiNotFoundResponse({
+    type: ExceptionResponseDto,
+    description: 'Fail when user not found',
+    example: {
+      statusCode: HttpStatus.NOT_FOUND,
+      timestamp: new Date().toISOString(),
+      path: '/api/auth/update-password',
+      message: 'User with email: someemail@example.com not found',
+    },
+  })
+  @ApiBadRequestResponse({
+    type: ExceptionResponseDto,
+    description: 'Fail when request body invalid',
+    examples: {
+      a: {
+        summary: 'request body is empty',
+        value: {
+          statusCode: HttpStatus.BAD_REQUEST,
+          timestamp: new Date().toISOString(),
+          path: '/api/auth/update-password',
+          message: 'Invalid input: expected object, received undefined',
+        },
+      },
+      b: {
+        summary: 'password format is invalid',
+        value: {
+          statusCode: HttpStatus.BAD_REQUEST,
+          timestamp: new Date().toISOString(),
+          path: '/api/auth/update-password',
+          message: 'Please enter a valid password',
+        },
+      },
+    },
+  })
+  @Post('update-password')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(ParamJwtAuthGuard)
+  async updatePassword(
+    @User('email') email: string,
+    @Body(new ZodValidationPipe(passwordSchema)) updatePasswordDto: UpdatePasswordDto,
+  ) {
+    console.log('body: ', updatePasswordDto);
+
+    const message = await this.authService.updatePassword(
+      email,
+      updatePasswordDto.password,
+    );
+    return {
+      payload: null,
+      message,
+    } as AuthResponseDto;
+  }
+
   private setAuthCookies(
     res: Response,
     accessToken: string,

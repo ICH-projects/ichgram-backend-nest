@@ -23,6 +23,7 @@ describe('AUTH (e2e)', () => {
   const logoutPath = `/v${version}/api/auth/logout`;
   const refreshPath = `/v${version}/api/auth/refresh`;
   const resetPasswordPath = `/v${version}/api/auth/reset-password`;
+  const updatePasswordPath = `/v${version}/api/auth/update-password`;
 
   let app: INestApplication;
   let sequelize: Sequelize;
@@ -454,7 +455,7 @@ describe('AUTH (e2e)', () => {
       });
     });
 
-    it(`should sign up successfully with valid credentials`, async () => {
+    it(`should request to reset password processed successfully with valid credentials`, async () => {
       const body = { email: 'zolotukhinpv@i.ua' };
       const response = await request(app.getHttpServer())
         .post(resetPasswordPath)
@@ -501,6 +502,106 @@ describe('AUTH (e2e)', () => {
 
       expect(response.body.message).toMatch(
         `User with email: ${body.email} not found`,
+      );
+    });
+
+    it(`should request to update password processed successfully with valid credentials`, async () => {
+      const body = { password: validBody.password };
+      const token: string = await jwtService.signAsync(
+        {
+          email: validBody.email,
+        },
+        { expiresIn: '15m', secret: process.env.JWT_SECRET },
+      );
+      const response = await request(app.getHttpServer())
+        .post(updatePasswordPath)
+        .send(body)
+        .query({ token })
+        .expect(200);
+
+      expect(response.body.message).toBe(`Password successfully updated`);
+    });
+
+    it(`should fail when request body is empty`, async () => {
+      const body = undefined;
+      const token: string = await jwtService.signAsync(
+        {
+          email: validBody.email,
+        },
+        { expiresIn: '15m', secret: process.env.JWT_SECRET },
+      );
+      const response = await request(app.getHttpServer())
+        .post(updatePasswordPath)
+        .send(body)
+        .query({ token })
+        .expect(400);
+
+      expect(response.body.message).toBe(
+        `✖ Invalid input: expected object, received undefined`,
+      );
+    });
+
+    it(`should fail when password format is invalid`, async () => {
+      const body = { password: 'wrongpasswordformaat' };
+      const token: string = await jwtService.signAsync(
+        {
+          email: validBody.email,
+        },
+        { expiresIn: '15m', secret: process.env.JWT_SECRET },
+      );
+
+      const response = await request(app.getHttpServer())
+        .post(updatePasswordPath)
+        .send(body)
+        .query({ token })
+        .expect(400);
+
+      expect(response.body.message).toMatch(/Password must contain/);
+    });
+
+    it(`should fail when token is missing`, async () => {
+      const body = { password: validBody.password };
+
+      const response = await request(app.getHttpServer())
+        .post(updatePasswordPath)
+        .send(body)
+        .expect(401);
+
+      expect(response.body.message).toBe(`Unauthorized`);
+    });
+
+    it(`should fail when token is not valid`, async () => {
+      const body = { password: validBody.password };
+      const token: string = 'wrong_token';
+
+      const response = await request(app.getHttpServer())
+        .post(updatePasswordPath)
+        .query({ token })
+        .send(body)
+        .expect(401);
+
+      expect(response.body.message).toBe(`Unauthorized`);
+    });
+
+    it(`should fail when token is wrong`, async () => {
+      const body = {  password: validBody.password };
+      const wrongEmail = 'zolotukhinpv2@i.ua';
+
+      const token: string = await jwtService.signAsync(
+        {
+          email: wrongEmail,
+        },
+        { expiresIn: '15m', secret: process.env.JWT_SECRET },
+      );
+
+      const response = await request(app.getHttpServer())
+        .post(updatePasswordPath)
+        .query({ token })
+        .send(body)
+        .expect(404);
+
+      expect(response.body.message).toBe(
+        `User with email: ${wrongEmail} not found`,
       );
     });
   });
