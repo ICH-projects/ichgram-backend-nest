@@ -164,12 +164,33 @@ export class AuthService {
     return `Password successfully updated`;
   }
 
-  async deleteUser(userEmail: string): Promise<string> {
+  async deleteRequest(email: string): Promise<string> {
+    const user = await User.findOne({ where: { email } });
+    if (!user)
+      throw new HttpException(
+        `User with email: ${email} not found`,
+        HttpStatus.NOT_FOUND,
+      );
+    const { confirmationToken } = await this.createToken({
+      email,
+    });
+
+    console.log('before email');
+
+    await this.sendConfirmationEmail(
+      [email],
+      confirmationToken,
+      MAIL_TYPES.DeleteConfirmation,
+    );
+    return `Delete User. A message containing a confirmation link has been sent to email: ${email}`;
+  }
+
+  async delete(userEmail: string): Promise<string> {
     const user = await User.findOne({ where: { email: userEmail } });
     if (!user)
       throw new HttpException(
         `User with email: ${userEmail} not found`,
-        HttpStatus.BAD_REQUEST,
+        HttpStatus.NOT_FOUND,
       );
     await user.destroy();
     return `User successfully deleted`;
@@ -201,7 +222,7 @@ export class AuthService {
       subject: `Welcome to ${process.env.APP}`,
       template: mailTemplates[emailType].template,
       context: {
-        name: 'user',
+        name: emailsList[0],
         verificationLink: `${process.env.FRONTEND_BASE_URL}/${mailTemplates[emailType].link}?token=${confirmationToken}`,
       },
     });

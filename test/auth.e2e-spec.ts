@@ -24,6 +24,8 @@ describe('AUTH (e2e)', () => {
   const refreshPath = `/v${version}/api/auth/refresh`;
   const resetPasswordPath = `/v${version}/api/auth/reset-password`;
   const updatePasswordPath = `/v${version}/api/auth/update-password`;
+  const deleteUserPath = `/v${version}/api/auth/delete`;
+  const confirmDeleteUserPath = `/v${version}/api/auth/confirm-delete`;
 
   let app: INestApplication;
   let sequelize: Sequelize;
@@ -584,7 +586,7 @@ describe('AUTH (e2e)', () => {
     });
 
     it(`should fail when token is wrong`, async () => {
-      const body = {  password: validBody.password };
+      const body = { password: validBody.password };
       const wrongEmail = 'zolotukhinpv2@i.ua';
 
       const token: string = await jwtService.signAsync(
@@ -598,6 +600,116 @@ describe('AUTH (e2e)', () => {
         .post(updatePasswordPath)
         .query({ token })
         .send(body)
+        .expect(404);
+
+      expect(response.body.message).toBe(
+        `User with email: ${wrongEmail} not found`,
+      );
+    });
+  });
+
+  describe('DELETE_USER & CONFIRM_DELETE_USER', () => {
+    const validBody = { email: 'zolotukhinpv@i.ua', password: 'passWord1%' };
+    let accessToken: string;
+
+    beforeEach(async () => {
+      await userModel.create({
+        ...validBody,
+      });
+      accessToken = await jwtService.signAsync(
+        {
+          email: validBody.email,
+        },
+        { expiresIn: '15m', secret: process.env.JWT_SECRET },
+      );
+    });
+
+    it(`should request to delete user processed successfully with valid credentials`, async () => {
+      const response = await request(app.getHttpServer())
+        .delete(deleteUserPath)
+        .set('Cookie', `accessToken=${accessToken}`)
+        .expect(200);
+
+      expect(response.body.message).toBe(
+        `Delete User. A message containing a confirmation link has been sent to email: ${validBody.email}`,
+      );
+    });
+
+    it(`should fail when user not found`, async () => {
+      const body = { email: 'wrongemail@example.com' };
+      accessToken = await jwtService.signAsync(
+        {
+          email: body.email,
+        },
+        { expiresIn: '15m', secret: process.env.JWT_SECRET },
+      );
+      const response = await request(app.getHttpServer())
+        .delete(deleteUserPath)
+        .set('Cookie', `accessToken=${accessToken}`)
+        .expect(404);
+
+      expect(response.body.message).toMatch(
+        `User with email: ${body.email} not found`,
+      );
+    });
+
+    it(`should fail when token not exists`, async () => {
+      const response = await request(app.getHttpServer())
+        .delete(deleteUserPath)
+        .expect(401);
+
+      expect(response.body.message).toMatch(`Unauthorized`);
+    });
+
+    it(`should fail when token not valid`, async () => {
+      accessToken = 'wrongtoken';
+      const response = await request(app.getHttpServer())
+        .delete(deleteUserPath)
+        .set('Cookie', `accessToken=${accessToken}`)
+        .expect(401);
+
+      expect(response.body.message).toMatch(`Unauthorized`);
+    });
+
+    it(`should delete user successfully`, async () => {
+      await request(app.getHttpServer())
+        .delete(confirmDeleteUserPath)
+        .query({ token: accessToken })
+        .expect(204);
+    });
+
+    it(`should fail when token is missing`, async () => {
+      const response = await request(app.getHttpServer())
+        .delete(confirmDeleteUserPath)
+        .expect(401);
+
+      expect(response.body.message).toBe(`Unauthorized`);
+    });
+
+    it(`should fail when token is not valid`, async () => {
+      const token: string = 'wrong_token';
+
+      const response = await request(app.getHttpServer())
+        .delete(confirmDeleteUserPath)
+        .query({ token })
+        .expect(401);
+
+      expect(response.body.message).toBe(`Unauthorized`);
+    });
+
+    it(`should fail when token is wrong`, async () => {
+      const wrongEmail = 'zolotukhinpv2@i.ua';
+
+      const token: string = await jwtService.signAsync(
+        {
+          email: wrongEmail,
+        },
+        { expiresIn: '15m', secret: process.env.JWT_SECRET },
+      );
+
+      const response = await request(app.getHttpServer())
+        .delete(confirmDeleteUserPath)
+        .query({ token })
         .expect(404);
 
       expect(response.body.message).toBe(

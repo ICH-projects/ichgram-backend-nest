@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Header,
   HttpCode,
@@ -18,6 +19,7 @@ import {
   ApiCookieAuth,
   ApiForbiddenResponse,
   ApiHeader,
+  ApiNoContentResponse,
   ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
@@ -135,7 +137,9 @@ export class AuthController {
   })
   @Post('signup')
   @HttpCode(HttpStatus.CREATED)
-  async signup(@Body(new ZodValidationPipe(signupSchema)) signupDto: SignupDto): Promise<AuthResponseDto> {
+  async signup(
+    @Body(new ZodValidationPipe(signupSchema)) signupDto: SignupDto,
+  ): Promise<AuthResponseDto> {
     const message = await this.authService.signup(signupDto);
     return {
       payload: null,
@@ -513,7 +517,9 @@ export class AuthController {
   })
   @Post('reset-password')
   @HttpCode(HttpStatus.OK)
-  async resetPassword(@Body(new ZodValidationPipe(emailSchema)) emailDto: EmailDto) {
+  async resetPassword(
+    @Body(new ZodValidationPipe(emailSchema)) emailDto: EmailDto,
+  ) {
     const message = await this.authService.resetPassword(emailDto.email);
     return {
       payload: null,
@@ -583,10 +589,9 @@ export class AuthController {
   @UseGuards(ParamJwtAuthGuard)
   async updatePassword(
     @User('email') email: string,
-    @Body(new ZodValidationPipe(passwordSchema)) updatePasswordDto: UpdatePasswordDto,
+    @Body(new ZodValidationPipe(passwordSchema))
+    updatePasswordDto: UpdatePasswordDto,
   ) {
-    console.log('body: ', updatePasswordDto);
-
     const message = await this.authService.updatePassword(
       email,
       updatePasswordDto.password,
@@ -595,6 +600,107 @@ export class AuthController {
       payload: null,
       message,
     } as AuthResponseDto;
+  }
+
+  @ApiOperation({
+    summary: 'request to delete account',
+  })
+  @ApiOkResponse({
+    type: AuthResponseDto,
+    example: {
+      payload: null,
+      message:
+        'Delete User. A message containing a confirmation link has been sent to email: someemail@example.com',
+    },
+  })
+  @ApiUnauthorizedResponse({
+    type: ExceptionResponseDto,
+    description: 'token not valid or not exists',
+    examples: {
+      a: {
+        summary: 'token not valid',
+        value: {
+          statusCode: 401,
+          timestamp: '2025-11-28T19:44:42.437Z',
+          path: '/v1/api/auth/delete',
+          message: 'Unauthorized',
+        },
+      },
+      b: {
+        summary: 'token is not exists',
+        value: {
+          statusCode: 401,
+          timestamp: '2025-11-28T19:44:42.437Z',
+          path: '/v1/api/auth/delete',
+          message: 'Unauthorized',
+        },
+      },
+    },
+  })
+  @ApiNotFoundResponse({
+    type: ExceptionResponseDto,
+    description: 'Fail when user not found',
+    example: {
+      statusCode: HttpStatus.NOT_FOUND,
+      timestamp: new Date().toISOString(),
+      path: '/api/auth/delete',
+      message: 'User with email: someemail@example.com not found',
+    },
+  })
+  @Delete('delete')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(new AccessJwtAuthGuard('access_jwt_cookie'))
+  async deleteRequest(@User('email') email: string) {
+    const message = await this.authService.deleteRequest(email);
+    return {
+      payload: null,
+      message,
+    } as AuthResponseDto;
+  }
+
+  @ApiOperation({
+    summary: 'Delete account',
+  })
+  @ApiNoContentResponse({ description: 'User successfully deleted' })
+  @ApiUnauthorizedResponse({
+    type: ExceptionResponseDto,
+    description: 'token not valid or not exists',
+    examples: {
+      a: {
+        summary: 'token not valid',
+        value: {
+          statusCode: 401,
+          timestamp: '2025-11-28T19:44:42.437Z',
+          path: '/v1/api/auth/confirm-delete',
+          message: 'Unauthorized',
+        },
+      },
+      b: {
+        summary: 'token is not exists',
+        value: {
+          statusCode: 401,
+          timestamp: '2025-11-28T19:44:42.437Z',
+          path: '/v1/api/auth/confirm-delete',
+          message: 'Unauthorized',
+        },
+      },
+    },
+  })
+  @ApiNotFoundResponse({
+    type: ExceptionResponseDto,
+    description: 'Fail when user not found',
+    example: {
+      statusCode: HttpStatus.NOT_FOUND,
+      timestamp: new Date().toISOString(),
+      path: '/api/auth/confirm-delete',
+      message: 'User with email: someemail@example.com not found',
+    },
+  })
+  @Delete('confirm-delete')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @UseGuards(ParamJwtAuthGuard)
+  async delete(@User('email') email: string) {
+    await this.authService.delete(email);
   }
 
   private setAuthCookies(
