@@ -8,6 +8,7 @@ import { AuthModule } from './modules/auth/auth.module';
 import { PostsModule } from './modules/posts/posts.module';
 import { ProfilesModule } from './modules/profiles/profiles.module';
 import { ConversationsModule } from './modules/conversations/conversations.module';
+import { ChatTempSocketioModule } from './chat_temp_socketio/chat_temp_socketio.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { ConversationsModule } from './modules/conversations/conversations.modul
     PostsModule,
     ProfilesModule,
     ConversationsModule,
+    ChatTempSocketioModule,
   ],
   providers: [],
   controllers: [],

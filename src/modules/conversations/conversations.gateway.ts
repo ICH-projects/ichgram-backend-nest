@@ -7,7 +7,7 @@ import { CreateConversationDto } from './dto/create-conversation.dto';
 import { ConversationsService } from './services/conversations.service';
 import { UpdateConversationDto } from './dto/update-conversation.dto';
 
-@WebSocketGateway({ namespace: 'conversations' })
+@WebSocketGateway()
 export class ConversationsGateway {
   constructor(private readonly conversationsService: ConversationsService) {}
 
