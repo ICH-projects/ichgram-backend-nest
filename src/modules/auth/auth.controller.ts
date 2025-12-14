@@ -3,14 +3,11 @@ import {
   Controller,
   Delete,
   Get,
-  Header,
   HttpCode,
   HttpStatus,
   Post,
-  Req,
   Res,
   UseGuards,
-  UsePipes,
 } from '@nestjs/common';
 import {
   ApiBadRequestResponse,
@@ -18,7 +15,6 @@ import {
   ApiConflictResponse,
   ApiCookieAuth,
   ApiForbiddenResponse,
-  ApiHeader,
   ApiNoContentResponse,
   ApiNotFoundResponse,
   ApiOkResponse,

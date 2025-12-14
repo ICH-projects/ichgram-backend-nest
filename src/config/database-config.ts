@@ -20,5 +20,6 @@ export default (): SequelizeModuleOptions => {
     database: process.env.DATABASE_NAME,
     autoLoadModels: true,
     synchronize: true,
+    sync: { force: true },
   };
 };

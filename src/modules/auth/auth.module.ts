@@ -15,6 +15,7 @@ import {
   JwtParamStrategy,
   RefreshJwtCookieStrategy,
 } from './jwt.strategy';
+import { AccessJwtAuthGuard } from './jwt-auth.guard';
 
 @Module({
   imports: [
@@ -32,7 +33,9 @@ import {
     JwtParamStrategy,
     AccessJwtCookieStrategy,
     RefreshJwtCookieStrategy,
+    AccessJwtAuthGuard
   ],
   controllers: [AuthController],
+  exports: [AccessJwtAuthGuard]
 })
 export class AuthModule {}
