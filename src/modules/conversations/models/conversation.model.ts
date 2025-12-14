@@ -5,7 +5,7 @@ import {
   Model,
   Table,
 } from 'sequelize-typescript';
-import { Profile } from 'src/modules/profiles/models/profile.model';
+import { Profile } from '../../profiles/models/profile.model';
 
 @Table
 export class Conversation extends Model {
